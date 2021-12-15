@@ -5,8 +5,8 @@ go 1.16
 require (
 	github.com/charmbracelet/glamour v0.3.0
 	github.com/coreos/go-systemd v0.0.0-20190321100706-95778dfbb74e
-	github.com/fatih/color v1.12.0
-	github.com/fsnotify/fsnotify v1.4.9
+	github.com/fatih/color v1.13.0
+	github.com/fsnotify/fsnotify v1.5.1
 	github.com/godbus/dbus/v5 v5.0.4
 	github.com/golang/protobuf v1.5.2
 	github.com/gomarkdown/markdown v0.0.0-20210514010506-3b9f47219fe7
@@ -16,17 +16,17 @@ require (
 	github.com/sirupsen/logrus v1.8.1
 	github.com/snapcore/go-gettext v0.0.0-20191107141714-82bbea49e785
 	github.com/spf13/cobra v1.2.1
-	github.com/spf13/viper v1.8.1
+	github.com/spf13/viper v1.10.1
 	github.com/stretchr/testify v1.7.0
 	github.com/termie/go-shutil v0.0.0-20140729215957-bcacb06fecae
-	golang.org/x/net v0.0.0-20210508051633-16afe75a6701
+	golang.org/x/net v0.0.0-20210813160813-60bc85c4be6d
 	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c
-	golang.org/x/sys v0.0.0-20210510120138-977fb7262007
+	golang.org/x/sys v0.0.0-20211210111614-af8b64212486
 	golang.org/x/text v0.3.7
-	google.golang.org/grpc v1.40.0
+	google.golang.org/grpc v1.43.0
 	google.golang.org/grpc/cmd/protoc-gen-go-grpc v1.1.0
 	google.golang.org/protobuf v1.27.1
-	gopkg.in/ini.v1 v1.62.0
+	gopkg.in/ini.v1 v1.66.2
 	gopkg.in/yaml.v3 v3.0.0-20210107192922-496545a6307b
 	honnef.co/go/tools v0.2.1
 )
