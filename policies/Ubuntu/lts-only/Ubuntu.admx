@@ -50,6 +50,21 @@
     <category name="UbuntuInterface" displayName="$(string.UbuntuDisplayInterface)">
       <parentCategory ref="UbuntuLoginScreen" />
     </category>
+    <category name="UbuntuClientManagement" displayName="$(string.UbuntuDisplayClientManagement)">
+      <parentCategory ref="UbuntuUbuntu" />
+    </category>
+    <category name="UbuntuPrivilegeAuthorization" displayName="$(string.UbuntuDisplayPrivilegeAuthorization)">
+      <parentCategory ref="UbuntuClientManagement" />
+    </category>
+    <category name="UbuntuComputerScripts" displayName="$(string.UbuntuDisplayComputerScripts)">
+      <parentCategory ref="UbuntuClientManagement" />
+    </category>
+    <category name="UbuntuSessionManagement" displayName="$(string.UbuntuDisplaySessionManagement)">
+      <parentCategory ref="UbuntuUbuntu" />
+    </category>
+    <category name="UbuntuUserScripts" displayName="$(string.UbuntuDisplayUserScripts)">
+      <parentCategory ref="UbuntuSessionManagement" />
+    </category>
   </categories>
 
   <policies>
@@ -57,6 +72,7 @@
       <parentCategory ref="UbuntuAccessibility" />
       <supportedOn ref="Ubuntu" />
       <enabledValue><string>{"20.04":{"empty":"false","meta":"b"},"all":{"empty":"false","meta":"b"}}</string></enabledValue>
+      <disabledValue><string>{"20.04":{"meta":"b"},"all":{"meta":"b"}}</string></disabledValue>
       <elements>
         <boolean id="UbuntuElemUserAllDconfOrgGnomeDesktopInterfaceToolkitAccessibility" valueName="all">
           <trueValue><string>true</string></trueValue>
@@ -68,6 +84,7 @@
       <parentCategory ref="UbuntuAccessibility" />
       <supportedOn ref="Ubuntu" />
       <enabledValue><string>{"20.04":{"empty":"false","meta":"b"},"all":{"empty":"false","meta":"b"}}</string></enabledValue>
+      <disabledValue><string>{"20.04":{"meta":"b"},"all":{"meta":"b"}}</string></disabledValue>
       <elements>
         <boolean id="UbuntuElemUserAllDconfOrgGnomeDesktopA11yApplicationsScreenKeyboardEnabled" valueName="all">
           <trueValue><string>true</string></trueValue>
@@ -79,6 +96,7 @@
       <parentCategory ref="UbuntuAccessibility" />
       <supportedOn ref="Ubuntu" />
       <enabledValue><string>{"20.04":{"empty":"false","meta":"b"},"all":{"empty":"false","meta":"b"}}</string></enabledValue>
+      <disabledValue><string>{"20.04":{"meta":"b"},"all":{"meta":"b"}}</string></disabledValue>
       <elements>
         <boolean id="UbuntuElemUserAllDconfOrgGnomeDesktopA11yApplicationsScreenMagnifierEnabled" valueName="all">
           <trueValue><string>true</string></trueValue>
@@ -90,6 +108,7 @@
       <parentCategory ref="UbuntuAccessibility" />
       <supportedOn ref="Ubuntu" />
       <enabledValue><string>{"20.04":{"empty":"false","meta":"b"},"all":{"empty":"false","meta":"b"}}</string></enabledValue>
+      <disabledValue><string>{"20.04":{"meta":"b"},"all":{"meta":"b"}}</string></disabledValue>
       <elements>
         <boolean id="UbuntuElemUserAllDconfOrgGnomeDesktopA11yApplicationsScreenReaderEnabled" valueName="all">
           <trueValue><string>true</string></trueValue>
@@ -101,6 +120,7 @@
       <parentCategory ref="UbuntuBackground" />
       <supportedOn ref="Ubuntu" />
       <enabledValue><string>{"20.04":{"empty":"''","meta":"s"},"all":{"empty":"''","meta":"s"}}</string></enabledValue>
+      <disabledValue><string>{"20.04":{"meta":"s"},"all":{"meta":"s"}}</string></disabledValue>
       <elements>
         <text id="UbuntuElemUserAllDconfOrgGnomeDesktopBackgroundPictureUri" valueName="all" />
       </elements>
@@ -109,6 +129,7 @@
       <parentCategory ref="UbuntuBackground" />
       <supportedOn ref="Ubuntu" />
       <enabledValue><string>{"20.04":{"empty":"''","meta":"s"},"all":{"empty":"''","meta":"s"}}</string></enabledValue>
+      <disabledValue><string>{"20.04":{"meta":"s"},"all":{"meta":"s"}}</string></disabledValue>
       <elements>
         <enum id="UbuntuElemUserAllDconfOrgGnomeDesktopBackgroundPictureOptions" valueName="all">
           <item displayName="$(string.UbuntuItemUserAllDconfOrgGnomeDesktopBackgroundPictureOptions0)">
@@ -153,6 +174,7 @@
       <parentCategory ref="UbuntuShell" />
       <supportedOn ref="Ubuntu" />
       <enabledValue><string>{"20.04":{"empty":"[]","meta":"as"},"all":{"empty":"[]","meta":"as"}}</string></enabledValue>
+      <disabledValue><string>{"20.04":{"meta":"as"},"all":{"meta":"as"}}</string></disabledValue>
       <elements>
         <multiText id="UbuntuElemUserAllDconfOrgGnomeShellFavoriteApps" valueName="all" />
       </elements>
@@ -161,6 +183,7 @@
       <parentCategory ref="UbuntuShell" />
       <supportedOn ref="Ubuntu" />
       <enabledValue><string>{"20.04":{"empty":"false","meta":"b"},"all":{"empty":"false","meta":"b"}}</string></enabledValue>
+      <disabledValue><string>{"20.04":{"meta":"b"},"all":{"meta":"b"}}</string></disabledValue>
       <elements>
         <boolean id="UbuntuElemUserAllDconfOrgGnomeDesktopBackgroundShowDesktopIcons" valueName="all">
           <trueValue><string>true</string></trueValue>
@@ -172,6 +195,7 @@
       <parentCategory ref="UbuntuShell" />
       <supportedOn ref="Ubuntu" />
       <enabledValue><string>{"20.04":{"empty":"false","meta":"b"},"all":{"empty":"false","meta":"b"}}</string></enabledValue>
+      <disabledValue><string>{"20.04":{"meta":"b"},"all":{"meta":"b"}}</string></disabledValue>
       <elements>
         <boolean id="UbuntuElemUserAllDconfOrgGnomeShellExtensionsDashToDockShowShowAppsButton" valueName="all">
           <trueValue><string>true</string></trueValue>
@@ -183,6 +207,7 @@
       <parentCategory ref="UbuntuClock" />
       <supportedOn ref="Ubuntu" />
       <enabledValue><string>{"20.04":{"empty":"''","meta":"s"},"all":{"empty":"''","meta":"s"}}</string></enabledValue>
+      <disabledValue><string>{"20.04":{"meta":"s"},"all":{"meta":"s"}}</string></disabledValue>
       <elements>
         <enum id="UbuntuElemUserAllDconfOrgGnomeDesktopInterfaceClockFormat" valueName="all">
           <item displayName="$(string.UbuntuItemUserAllDconfOrgGnomeDesktopInterfaceClockFormat0)">
@@ -202,6 +227,7 @@
       <parentCategory ref="UbuntuClock" />
       <supportedOn ref="Ubuntu" />
       <enabledValue><string>{"20.04":{"empty":"false","meta":"b"},"all":{"empty":"false","meta":"b"}}</string></enabledValue>
+      <disabledValue><string>{"20.04":{"meta":"b"},"all":{"meta":"b"}}</string></disabledValue>
       <elements>
         <boolean id="UbuntuElemUserAllDconfOrgGnomeDesktopInterfaceClockShowDate" valueName="all">
           <trueValue><string>true</string></trueValue>
@@ -213,6 +239,7 @@
       <parentCategory ref="UbuntuClock" />
       <supportedOn ref="Ubuntu" />
       <enabledValue><string>{"20.04":{"empty":"false","meta":"b"},"all":{"empty":"false","meta":"b"}}</string></enabledValue>
+      <disabledValue><string>{"20.04":{"meta":"b"},"all":{"meta":"b"}}</string></disabledValue>
       <elements>
         <boolean id="UbuntuElemUserAllDconfOrgGnomeDesktopInterfaceClockShowWeekday" valueName="all">
           <trueValue><string>true</string></trueValue>
@@ -224,6 +251,7 @@
       <parentCategory ref="UbuntuNotifications" />
       <supportedOn ref="Ubuntu" />
       <enabledValue><string>{"20.04":{"empty":"false","meta":"b"},"all":{"empty":"false","meta":"b"}}</string></enabledValue>
+      <disabledValue><string>{"20.04":{"meta":"b"},"all":{"meta":"b"}}</string></disabledValue>
       <elements>
         <boolean id="UbuntuElemUserAllDconfOrgGnomeDesktopNotificationsShowBanners" valueName="all">
           <trueValue><string>true</string></trueValue>
@@ -235,6 +263,7 @@
       <parentCategory ref="UbuntuLockDown" />
       <supportedOn ref="Ubuntu" />
       <enabledValue><string>{"20.04":{"empty":"false","meta":"b"},"all":{"empty":"false","meta":"b"}}</string></enabledValue>
+      <disabledValue><string>{"20.04":{"meta":"b"},"all":{"meta":"b"}}</string></disabledValue>
       <elements>
         <boolean id="UbuntuElemUserAllDconfOrgGnomeDesktopLockdownDisableCommandLine" valueName="all">
           <trueValue><string>true</string></trueValue>
@@ -246,6 +275,7 @@
       <parentCategory ref="UbuntuLockDown" />
       <supportedOn ref="Ubuntu" />
       <enabledValue><string>{"20.04":{"empty":"false","meta":"b"},"all":{"empty":"false","meta":"b"}}</string></enabledValue>
+      <disabledValue><string>{"20.04":{"meta":"b"},"all":{"meta":"b"}}</string></disabledValue>
       <elements>
         <boolean id="UbuntuElemUserAllDconfOrgGnomeDesktopLockdownDisableLogOut" valueName="all">
           <trueValue><string>true</string></trueValue>
@@ -257,6 +287,7 @@
       <parentCategory ref="UbuntuLockDown" />
       <supportedOn ref="Ubuntu" />
       <enabledValue><string>{"20.04":{"empty":"false","meta":"b"},"all":{"empty":"false","meta":"b"}}</string></enabledValue>
+      <disabledValue><string>{"20.04":{"meta":"b"},"all":{"meta":"b"}}</string></disabledValue>
       <elements>
         <boolean id="UbuntuElemUserAllDconfOrgGnomeDesktopLockdownDisableUserSwitching" valueName="all">
           <trueValue><string>true</string></trueValue>
@@ -268,6 +299,7 @@
       <parentCategory ref="UbuntuLockDown" />
       <supportedOn ref="Ubuntu" />
       <enabledValue><string>{"20.04":{"empty":"false","meta":"b"},"all":{"empty":"false","meta":"b"}}</string></enabledValue>
+      <disabledValue><string>{"20.04":{"meta":"b"},"all":{"meta":"b"}}</string></disabledValue>
       <elements>
         <boolean id="UbuntuElemUserAllDconfOrgGnomeDesktopLockdownDisablePrinting" valueName="all">
           <trueValue><string>true</string></trueValue>
@@ -279,6 +311,7 @@
       <parentCategory ref="UbuntuLockDown" />
       <supportedOn ref="Ubuntu" />
       <enabledValue><string>{"20.04":{"empty":"false","meta":"b"},"all":{"empty":"false","meta":"b"}}</string></enabledValue>
+      <disabledValue><string>{"20.04":{"meta":"b"},"all":{"meta":"b"}}</string></disabledValue>
       <elements>
         <boolean id="UbuntuElemUserAllDconfOrgGnomeDesktopLockdownDisablePrintSetup" valueName="all">
           <trueValue><string>true</string></trueValue>
@@ -290,6 +323,7 @@
       <parentCategory ref="UbuntuLockDown" />
       <supportedOn ref="Ubuntu" />
       <enabledValue><string>{"20.04":{"empty":"false","meta":"b"},"all":{"empty":"false","meta":"b"}}</string></enabledValue>
+      <disabledValue><string>{"20.04":{"meta":"b"},"all":{"meta":"b"}}</string></disabledValue>
       <elements>
         <boolean id="UbuntuElemUserAllDconfOrgGnomeDesktopLockdownDisableSaveToDisk" valueName="all">
           <trueValue><string>true</string></trueValue>
@@ -301,6 +335,7 @@
       <parentCategory ref="UbuntuLockDown" />
       <supportedOn ref="Ubuntu" />
       <enabledValue><string>{"20.04":{"empty":"false","meta":"b"},"all":{"empty":"false","meta":"b"}}</string></enabledValue>
+      <disabledValue><string>{"20.04":{"meta":"b"},"all":{"meta":"b"}}</string></disabledValue>
       <elements>
         <boolean id="UbuntuElemUserAllDconfOrgGnomeDesktopLockdownUserAdministrationDisabled" valueName="all">
           <trueValue><string>true</string></trueValue>
@@ -312,6 +347,7 @@
       <parentCategory ref="UbuntuKeyboardShortcuts" />
       <supportedOn ref="Ubuntu" />
       <enabledValue><string>{"20.04":{"empty":"[]","meta":"as"},"all":{"empty":"[]","meta":"as"}}</string></enabledValue>
+      <disabledValue><string>{"20.04":{"meta":"as"},"all":{"meta":"as"}}</string></disabledValue>
       <elements>
         <multiText id="UbuntuElemUserAllDconfOrgGnomeSettingsDaemonPluginsMediaKeysControlCenter" valueName="all" />
       </elements>
@@ -320,6 +356,7 @@
       <parentCategory ref="UbuntuKeyboardShortcuts" />
       <supportedOn ref="Ubuntu" />
       <enabledValue><string>{"20.04":{"empty":"[]","meta":"as"},"all":{"empty":"[]","meta":"as"}}</string></enabledValue>
+      <disabledValue><string>{"20.04":{"meta":"as"},"all":{"meta":"as"}}</string></disabledValue>
       <elements>
         <multiText id="UbuntuElemUserAllDconfOrgGnomeSettingsDaemonPluginsMediaKeysTerminal" valueName="all" />
       </elements>
@@ -328,6 +365,7 @@
       <parentCategory ref="UbuntuKeyboardShortcuts" />
       <supportedOn ref="Ubuntu" />
       <enabledValue><string>{"20.04":{"empty":"[]","meta":"as"},"all":{"empty":"[]","meta":"as"}}</string></enabledValue>
+      <disabledValue><string>{"20.04":{"meta":"as"},"all":{"meta":"as"}}</string></disabledValue>
       <elements>
         <multiText id="UbuntuElemUserAllDconfOrgGnomeShellKeybindingsToggleOverview" valueName="all" />
       </elements>
@@ -336,6 +374,7 @@
       <parentCategory ref="UbuntuKeyboardShortcuts" />
       <supportedOn ref="Ubuntu" />
       <enabledValue><string>{"20.04":{"empty":"[]","meta":"as"},"all":{"empty":"[]","meta":"as"}}</string></enabledValue>
+      <disabledValue><string>{"20.04":{"meta":"as"},"all":{"meta":"as"}}</string></disabledValue>
       <elements>
         <multiText id="UbuntuElemUserAllDconfOrgGnomeShellKeybindingsToggleApplicationView" valueName="all" />
       </elements>
@@ -344,6 +383,7 @@
       <parentCategory ref="UbuntuKeyboardShortcuts" />
       <supportedOn ref="Ubuntu" />
       <enabledValue><string>{"20.04":{"empty":"[]","meta":"as"},"all":{"empty":"[]","meta":"as"}}</string></enabledValue>
+      <disabledValue><string>{"20.04":{"meta":"as"},"all":{"meta":"as"}}</string></disabledValue>
       <elements>
         <multiText id="UbuntuElemUserAllDconfOrgGnomeDesktopWmKeybindingsPanelMainMenu" valueName="all" />
       </elements>
@@ -352,6 +392,7 @@
       <parentCategory ref="UbuntuKeyboardShortcuts" />
       <supportedOn ref="Ubuntu" />
       <enabledValue><string>{"20.04":{"empty":"''","meta":"s"},"all":{"empty":"''","meta":"s"}}</string></enabledValue>
+      <disabledValue><string>{"20.04":{"meta":"s"},"all":{"meta":"s"}}</string></disabledValue>
       <elements>
         <text id="UbuntuElemUserAllDconfOrgGnomeMutterOverlayKey" valueName="all" />
       </elements>
@@ -360,6 +401,7 @@
       <parentCategory ref="UbuntuScreensaver" />
       <supportedOn ref="Ubuntu" />
       <enabledValue><string>{"20.04":{"empty":"''","meta":"s"},"all":{"empty":"''","meta":"s"}}</string></enabledValue>
+      <disabledValue><string>{"20.04":{"meta":"s"},"all":{"meta":"s"}}</string></disabledValue>
       <elements>
         <text id="UbuntuElemUserAllDconfOrgGnomeDesktopScreensaverPictureUri" valueName="all" />
       </elements>
@@ -368,6 +410,7 @@
       <parentCategory ref="UbuntuScreensaver" />
       <supportedOn ref="Ubuntu" />
       <enabledValue><string>{"20.04":{"empty":"''","meta":"s"},"all":{"empty":"''","meta":"s"}}</string></enabledValue>
+      <disabledValue><string>{"20.04":{"meta":"s"},"all":{"meta":"s"}}</string></disabledValue>
       <elements>
         <enum id="UbuntuElemUserAllDconfOrgGnomeDesktopScreensaverPictureOptions" valueName="all">
           <item displayName="$(string.UbuntuItemUserAllDconfOrgGnomeDesktopScreensaverPictureOptions0)">
@@ -412,6 +455,7 @@
       <parentCategory ref="UbuntuScreensaver" />
       <supportedOn ref="Ubuntu" />
       <enabledValue><string>{"20.04":{"empty":"false","meta":"b"},"all":{"empty":"false","meta":"b"}}</string></enabledValue>
+      <disabledValue><string>{"20.04":{"meta":"b"},"all":{"meta":"b"}}</string></disabledValue>
       <elements>
         <boolean id="UbuntuElemUserAllDconfOrgGnomeDesktopNotificationsShowInLockScreen" valueName="all">
           <trueValue><string>true</string></trueValue>
@@ -423,6 +467,7 @@
       <parentCategory ref="UbuntuScreensaver" />
       <supportedOn ref="Ubuntu" />
       <enabledValue><string>{"20.04":{"empty":"false","meta":"b"},"all":{"empty":"false","meta":"b"}}</string></enabledValue>
+      <disabledValue><string>{"20.04":{"meta":"b"},"all":{"meta":"b"}}</string></disabledValue>
       <elements>
         <boolean id="UbuntuElemUserAllDconfOrgGnomeDesktopLockdownDisableLockScreen" valueName="all">
           <trueValue><string>true</string></trueValue>
@@ -434,6 +479,7 @@
       <parentCategory ref="UbuntuPeripherals" />
       <supportedOn ref="Ubuntu" />
       <enabledValue><string>{"20.04":{"empty":"false","meta":"b"},"all":{"empty":"false","meta":"b"}}</string></enabledValue>
+      <disabledValue><string>{"20.04":{"meta":"b"},"all":{"meta":"b"}}</string></disabledValue>
       <elements>
         <boolean id="UbuntuElemUserAllDconfOrgGnomeDesktopMediaHandlingAutomount" valueName="all">
           <trueValue><string>true</string></trueValue>
@@ -445,6 +491,7 @@
       <parentCategory ref="UbuntuLoginScreen" />
       <supportedOn ref="Ubuntu" />
       <enabledValue><string>{"20.04":{"empty":"false","meta":"b"},"all":{"empty":"false","meta":"b"}}</string></enabledValue>
+      <disabledValue><string>{"20.04":{"meta":"b"},"all":{"meta":"b"}}</string></disabledValue>
       <elements>
         <boolean id="UbuntuElemMachineAllGdmDconfOrgGnomeLoginScreenDisableRestartButtons" valueName="all">
           <trueValue><string>true</string></trueValue>
@@ -456,6 +503,7 @@
       <parentCategory ref="UbuntuLoginScreen" />
       <supportedOn ref="Ubuntu" />
       <enabledValue><string>{"20.04":{"empty":"false","meta":"b"},"all":{"empty":"false","meta":"b"}}</string></enabledValue>
+      <disabledValue><string>{"20.04":{"meta":"b"},"all":{"meta":"b"}}</string></disabledValue>
       <elements>
         <boolean id="UbuntuElemMachineAllGdmDconfOrgGnomeDesktopNotificationsShowInLockScreen" valueName="all">
           <trueValue><string>true</string></trueValue>
@@ -467,6 +515,7 @@
       <parentCategory ref="UbuntuLoginScreen" />
       <supportedOn ref="Ubuntu" />
       <enabledValue><string>{"20.04":{"empty":"false","meta":"b"},"all":{"empty":"false","meta":"b"}}</string></enabledValue>
+      <disabledValue><string>{"20.04":{"meta":"b"},"all":{"meta":"b"}}</string></disabledValue>
       <elements>
         <boolean id="UbuntuElemMachineAllGdmDconfOrgGnomeDesktopNotificationsShowBanners" valueName="all">
           <trueValue><string>true</string></trueValue>
@@ -478,6 +527,7 @@
       <parentCategory ref="UbuntuLoginScreen" />
       <supportedOn ref="Ubuntu" />
       <enabledValue><string>{"20.04":{"empty":"false","meta":"b"},"all":{"empty":"false","meta":"b"}}</string></enabledValue>
+      <disabledValue><string>{"20.04":{"meta":"b"},"all":{"meta":"b"}}</string></disabledValue>
       <elements>
         <boolean id="UbuntuElemMachineAllGdmDconfOrgGnomeDesktopInterfaceToolkitAccessibility" valueName="all">
           <trueValue><string>true</string></trueValue>
@@ -489,6 +539,7 @@
       <parentCategory ref="UbuntuLoginScreen" />
       <supportedOn ref="Ubuntu" />
       <enabledValue><string>{"20.04":{"empty":"false","meta":"b"},"all":{"empty":"false","meta":"b"}}</string></enabledValue>
+      <disabledValue><string>{"20.04":{"meta":"b"},"all":{"meta":"b"}}</string></disabledValue>
       <elements>
         <boolean id="UbuntuElemMachineAllGdmDconfOrgGnomeLoginScreenDisableUserList" valueName="all">
           <trueValue><string>true</string></trueValue>
@@ -500,6 +551,7 @@
       <parentCategory ref="UbuntuAuthentication" />
       <supportedOn ref="Ubuntu" />
       <enabledValue><string>{"20.04":{"empty":"false","meta":"b"},"all":{"empty":"false","meta":"b"}}</string></enabledValue>
+      <disabledValue><string>{"20.04":{"meta":"b"},"all":{"meta":"b"}}</string></disabledValue>
       <elements>
         <boolean id="UbuntuElemMachineAllGdmDconfOrgGnomeLoginScreenEnablePasswordAuthentication" valueName="all">
           <trueValue><string>true</string></trueValue>
@@ -511,6 +563,7 @@
       <parentCategory ref="UbuntuAuthentication" />
       <supportedOn ref="Ubuntu" />
       <enabledValue><string>{"20.04":{"empty":"false","meta":"b"},"all":{"empty":"false","meta":"b"}}</string></enabledValue>
+      <disabledValue><string>{"20.04":{"meta":"b"},"all":{"meta":"b"}}</string></disabledValue>
       <elements>
         <boolean id="UbuntuElemMachineAllGdmDconfOrgGnomeLoginScreenEnableFingerprintAuthentication" valueName="all">
           <trueValue><string>true</string></trueValue>
@@ -522,6 +575,7 @@
       <parentCategory ref="UbuntuAuthentication" />
       <supportedOn ref="Ubuntu" />
       <enabledValue><string>{"20.04":{"empty":"false","meta":"b"},"all":{"empty":"false","meta":"b"}}</string></enabledValue>
+      <disabledValue><string>{"20.04":{"meta":"b"},"all":{"meta":"b"}}</string></disabledValue>
       <elements>
         <boolean id="UbuntuElemMachineAllGdmDconfOrgGnomeLoginScreenEnableSmartcardAuthentication" valueName="all">
           <trueValue><string>true</string></trueValue>
@@ -533,6 +587,7 @@
       <parentCategory ref="UbuntuAuthentication" />
       <supportedOn ref="Ubuntu" />
       <enabledValue><string>{"20.04":{"empty":"0","meta":"i"},"all":{"empty":"0","meta":"i"}}</string></enabledValue>
+      <disabledValue><string>{"20.04":{"meta":"i"},"all":{"meta":"i"}}</string></disabledValue>
       <elements>
         <decimal id="UbuntuElemMachineAllGdmDconfOrgGnomeLoginScreenAllowedFailures" valueName="all" />
       </elements>
@@ -541,6 +596,7 @@
       <parentCategory ref="UbuntuInterface" />
       <supportedOn ref="Ubuntu" />
       <enabledValue><string>{"20.04":{"empty":"''","meta":"s"},"all":{"empty":"''","meta":"s"}}</string></enabledValue>
+      <disabledValue><string>{"20.04":{"meta":"s"},"all":{"meta":"s"}}</string></disabledValue>
       <elements>
         <enum id="UbuntuElemMachineAllGdmDconfOrgGnomeDesktopInterfaceClockFormat" valueName="all">
           <item displayName="$(string.UbuntuItemMachineAllGdmDconfOrgGnomeDesktopInterfaceClockFormat0)">
@@ -560,6 +616,7 @@
       <parentCategory ref="UbuntuInterface" />
       <supportedOn ref="Ubuntu" />
       <enabledValue><string>{"20.04":{"empty":"false","meta":"b"},"all":{"empty":"false","meta":"b"}}</string></enabledValue>
+      <disabledValue><string>{"20.04":{"meta":"b"},"all":{"meta":"b"}}</string></disabledValue>
       <elements>
         <boolean id="UbuntuElemMachineAllGdmDconfOrgGnomeDesktopInterfaceClockShowDate" valueName="all">
           <trueValue><string>true</string></trueValue>
@@ -571,6 +628,7 @@
       <parentCategory ref="UbuntuInterface" />
       <supportedOn ref="Ubuntu" />
       <enabledValue><string>{"20.04":{"empty":"false","meta":"b"},"all":{"empty":"false","meta":"b"}}</string></enabledValue>
+      <disabledValue><string>{"20.04":{"meta":"b"},"all":{"meta":"b"}}</string></disabledValue>
       <elements>
         <boolean id="UbuntuElemMachineAllGdmDconfOrgGnomeDesktopInterfaceClockShowWeekday" valueName="all">
           <trueValue><string>true</string></trueValue>
@@ -582,6 +640,7 @@
       <parentCategory ref="UbuntuInterface" />
       <supportedOn ref="Ubuntu" />
       <enabledValue><string>{"20.04":{"empty":"false","meta":"b"},"all":{"empty":"false","meta":"b"}}</string></enabledValue>
+      <disabledValue><string>{"20.04":{"meta":"b"},"all":{"meta":"b"}}</string></disabledValue>
       <elements>
         <boolean id="UbuntuElemMachineAllGdmDconfOrgGnomeLoginScreenBannerMessageEnable" valueName="all">
           <trueValue><string>true</string></trueValue>
@@ -593,6 +652,7 @@
       <parentCategory ref="UbuntuInterface" />
       <supportedOn ref="Ubuntu" />
       <enabledValue><string>{"20.04":{"empty":"''","meta":"s"},"all":{"empty":"''","meta":"s"}}</string></enabledValue>
+      <disabledValue><string>{"20.04":{"meta":"s"},"all":{"meta":"s"}}</string></disabledValue>
       <elements>
         <text id="UbuntuElemMachineAllGdmDconfOrgGnomeLoginScreenBannerMessageText" valueName="all" />
       </elements>
@@ -601,6 +661,7 @@
       <parentCategory ref="UbuntuInterface" />
       <supportedOn ref="Ubuntu" />
       <enabledValue><string>{"20.04":{"empty":"''","meta":"s"},"all":{"empty":"''","meta":"s"}}</string></enabledValue>
+      <disabledValue><string>{"20.04":{"meta":"s"},"all":{"meta":"s"}}</string></disabledValue>
       <elements>
         <text id="UbuntuElemMachineAllGdmDconfOrgGnomeLoginScreenLogo" valueName="all" />
       </elements>
@@ -609,6 +670,7 @@
       <parentCategory ref="UbuntuInterface" />
       <supportedOn ref="Ubuntu" />
       <enabledValue><string>{"20.04":{"empty":"''","meta":"s"},"all":{"empty":"''","meta":"s"}}</string></enabledValue>
+      <disabledValue><string>{"20.04":{"meta":"s"},"all":{"meta":"s"}}</string></disabledValue>
       <elements>
         <text id="UbuntuElemMachineAllGdmDconfComUbuntuLoginScreenBackgroundColor" valueName="all" />
       </elements>
@@ -617,6 +679,7 @@
       <parentCategory ref="UbuntuInterface" />
       <supportedOn ref="Ubuntu" />
       <enabledValue><string>{"20.04":{"empty":"''","meta":"s"},"all":{"empty":"''","meta":"s"}}</string></enabledValue>
+      <disabledValue><string>{"20.04":{"meta":"s"},"all":{"meta":"s"}}</string></disabledValue>
       <elements>
         <text id="UbuntuElemMachineAllGdmDconfComUbuntuLoginScreenBackgroundPictureUri" valueName="all" />
       </elements>
@@ -625,6 +688,7 @@
       <parentCategory ref="UbuntuInterface" />
       <supportedOn ref="Ubuntu" />
       <enabledValue><string>{"20.04":{"empty":"''","meta":"s"},"all":{"empty":"''","meta":"s"}}</string></enabledValue>
+      <disabledValue><string>{"20.04":{"meta":"s"},"all":{"meta":"s"}}</string></disabledValue>
       <elements>
         <enum id="UbuntuElemMachineAllGdmDconfComUbuntuLoginScreenBackgroundRepeat" valueName="all">
           <item displayName="$(string.UbuntuItemMachineAllGdmDconfComUbuntuLoginScreenBackgroundRepeat0)">
@@ -669,6 +733,7 @@
       <parentCategory ref="UbuntuInterface" />
       <supportedOn ref="Ubuntu" />
       <enabledValue><string>{"20.04":{"empty":"''","meta":"s"},"all":{"empty":"''","meta":"s"}}</string></enabledValue>
+      <disabledValue><string>{"20.04":{"meta":"s"},"all":{"meta":"s"}}</string></disabledValue>
       <elements>
         <enum id="UbuntuElemMachineAllGdmDconfComUbuntuLoginScreenBackgroundSize" valueName="all">
           <item displayName="$(string.UbuntuItemMachineAllGdmDconfComUbuntuLoginScreenBackgroundSize0)">
@@ -692,6 +757,57 @@
             </value>
           </item>
         </enum>
+      </elements>
+    </policy>
+    <policy name="UbuntuMachinePrivilegeClientAdmins" class="Machine" displayName="$(string.UbuntuDisplayMachineAllPrivilegeClientAdmins)" explainText="$(string.UbuntuExplainTextMachinePrivilegeClientAdmins)" presentation="$(presentation.UbuntuPresentationMachinePrivilegeClientAdmins)" key="Software\Policies\Ubuntu\privilege\client-admins" valueName="metaValues">
+      <parentCategory ref="UbuntuPrivilegeAuthorization" />
+      <supportedOn ref="Ubuntu" />
+      <enabledValue><string>{"all":{}}</string></enabledValue>
+      <disabledValue><string>{"all":{}}</string></disabledValue>
+      <elements>
+        <multiText id="UbuntuElemMachineAllPrivilegeClientAdmins" valueName="all" />
+      </elements>
+    </policy>
+    <policy name="UbuntuMachinePrivilegeAllowLocalAdmins" class="Machine" displayName="$(string.UbuntuDisplayMachineAllPrivilegeAllowLocalAdmins)" explainText="$(string.UbuntuExplainTextMachinePrivilegeAllowLocalAdmins)" presentation="$(presentation.UbuntuPresentationMachinePrivilegeAllowLocalAdmins)" key="Software\Policies\Ubuntu\privilege\allow-local-admins" valueName="basic">
+      <parentCategory ref="UbuntuPrivilegeAuthorization" />
+      <supportedOn ref="Ubuntu" />
+      <enabledValue><string>{"all":{}}</string></enabledValue>
+      <disabledValue><string>{"all":{}}</string></disabledValue>
+    </policy>
+    <policy name="UbuntuMachineScriptsStartup" class="Machine" displayName="$(string.UbuntuDisplayMachineAllScriptsStartup)" explainText="$(string.UbuntuExplainTextMachineScriptsStartup)" presentation="$(presentation.UbuntuPresentationMachineScriptsStartup)" key="Software\Policies\Ubuntu\scripts\startup" valueName="metaValues">
+      <parentCategory ref="UbuntuComputerScripts" />
+      <supportedOn ref="Ubuntu" />
+      <enabledValue><string>{"20.04":{"strategy":"append"},"all":{"strategy":"append"}}</string></enabledValue>
+      <disabledValue><string>{"20.04":{"strategy":"append"},"all":{"strategy":"append"}}</string></disabledValue>
+      <elements>
+        <multiText id="UbuntuElemMachineAllScriptsStartup" valueName="all" />
+      </elements>
+    </policy>
+    <policy name="UbuntuMachineScriptsShutdown" class="Machine" displayName="$(string.UbuntuDisplayMachineAllScriptsShutdown)" explainText="$(string.UbuntuExplainTextMachineScriptsShutdown)" presentation="$(presentation.UbuntuPresentationMachineScriptsShutdown)" key="Software\Policies\Ubuntu\scripts\shutdown" valueName="metaValues">
+      <parentCategory ref="UbuntuComputerScripts" />
+      <supportedOn ref="Ubuntu" />
+      <enabledValue><string>{"20.04":{"strategy":"append"},"all":{"strategy":"append"}}</string></enabledValue>
+      <disabledValue><string>{"20.04":{"strategy":"append"},"all":{"strategy":"append"}}</string></disabledValue>
+      <elements>
+        <multiText id="UbuntuElemMachineAllScriptsShutdown" valueName="all" />
+      </elements>
+    </policy>
+    <policy name="UbuntuUserScriptsLogon" class="User" displayName="$(string.UbuntuDisplayUserAllScriptsLogon)" explainText="$(string.UbuntuExplainTextUserScriptsLogon)" presentation="$(presentation.UbuntuPresentationUserScriptsLogon)" key="Software\Policies\Ubuntu\scripts\logon" valueName="metaValues">
+      <parentCategory ref="UbuntuUserScripts" />
+      <supportedOn ref="Ubuntu" />
+      <enabledValue><string>{"20.04":{"strategy":"append"},"all":{"strategy":"append"}}</string></enabledValue>
+      <disabledValue><string>{"20.04":{"strategy":"append"},"all":{"strategy":"append"}}</string></disabledValue>
+      <elements>
+        <multiText id="UbuntuElemUserAllScriptsLogon" valueName="all" />
+      </elements>
+    </policy>
+    <policy name="UbuntuUserScriptsLogoff" class="User" displayName="$(string.UbuntuDisplayUserAllScriptsLogoff)" explainText="$(string.UbuntuExplainTextUserScriptsLogoff)" presentation="$(presentation.UbuntuPresentationUserScriptsLogoff)" key="Software\Policies\Ubuntu\scripts\logoff" valueName="metaValues">
+      <parentCategory ref="UbuntuUserScripts" />
+      <supportedOn ref="Ubuntu" />
+      <enabledValue><string>{"20.04":{"strategy":"append"},"all":{"strategy":"append"}}</string></enabledValue>
+      <disabledValue><string>{"20.04":{"strategy":"append"},"all":{"strategy":"append"}}</string></disabledValue>
+      <elements>
+        <multiText id="UbuntuElemUserAllScriptsLogoff" valueName="all" />
       </elements>
     </policy>
   </policies>

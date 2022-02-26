@@ -2,7 +2,6 @@ package adsys_test
 
 import (
 	"bytes"
-	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -29,11 +28,11 @@ func TestServiceStop(t *testing.T) {
 
 		wantErr bool
 	}{
-		"Stop daemon":           {daemonAnswer: "yes"},
-		"Stop daemon denied":    {daemonAnswer: "no", wantErr: true},
+		"Stop daemon":           {daemonAnswer: "polkit_yes"},
+		"Stop daemon denied":    {daemonAnswer: "polkit_no", wantErr: true},
 		"Daemon not responding": {daemonNotStarted: true, wantErr: true},
 
-		"Force stop doesn’t exit on error": {daemonAnswer: "yes", force: true, wantErr: false},
+		"Force stop doesn’t exit on error": {daemonAnswer: "polkit_yes", force: true, wantErr: false},
 	}
 	for name, tc := range tests {
 		tc := tc
@@ -61,11 +60,11 @@ func TestServiceStop(t *testing.T) {
 }
 
 func TestServiceStopWaitForHangingClient(t *testing.T) {
-	systemAnswer(t, "yes")
+	systemAnswer(t, "polkit_yes")
 
 	conf := createConf(t, "")
 	d := daemon.New()
-	changeOsArgs(t, conf)
+	changeAppArgs(t, d, conf)
 
 	daemonStopped := make(chan struct{})
 	go func() {
@@ -105,11 +104,11 @@ func TestServiceStopWaitForHangingClient(t *testing.T) {
 }
 
 func TestServiceStopForcedWithHangingClient(t *testing.T) {
-	systemAnswer(t, "yes")
+	systemAnswer(t, "polkit_yes")
 
 	conf := createConf(t, "")
 	d := daemon.New()
-	changeOsArgs(t, conf)
+	changeAppArgs(t, d, conf)
 
 	daemonStopped := make(chan struct{})
 	go func() {
@@ -154,15 +153,15 @@ func TestServiceCat(t *testing.T) {
 
 		wantErr bool
 	}{
-		"Cat other clients and daemon - cover daemon": {systemAnswer: "yes"},
-		"Cat denied - cover daemon":                   {systemAnswer: "no", wantErr: true},
+		"Cat other clients and daemon - cover daemon": {systemAnswer: "polkit_yes"},
+		"Cat denied - cover daemon":                   {systemAnswer: "polkit_no", wantErr: true},
 		"Daemon not responding - cover daemon":        {daemonNotStarted: true, wantErr: true},
 
-		"Cat other clients and daemon - cover client": {systemAnswer: "yes", coverCatClient: true},
-		"Cat denied - cover client":                   {systemAnswer: "no", coverCatClient: true, wantErr: true},
+		"Cat other clients and daemon - cover client": {systemAnswer: "polkit_yes", coverCatClient: true},
+		"Cat denied - cover client":                   {systemAnswer: "polkit_no", coverCatClient: true, wantErr: true},
 		"Daemon not responding - cover client":        {daemonNotStarted: true, coverCatClient: true, wantErr: true},
 
-		"Multiple cats": {multipleCats: true, systemAnswer: "yes"},
+		"Multiple cats": {multipleCats: true, systemAnswer: "polkit_yes"},
 	}
 	for name, tc := range tests {
 		tc := tc
@@ -183,7 +182,7 @@ func TestServiceCat(t *testing.T) {
 			}
 
 			var outCat, outCat2 func() string
-			var stopCat, stopCat2 func() error
+			var stopCat, stopCat2 func()
 			if tc.coverCatClient {
 				// create cat client and control it, capturing stderr for logs
 
@@ -199,24 +198,22 @@ func TestServiceCat(t *testing.T) {
 				done := make(chan struct{})
 				go func() {
 					defer close(done)
-					changeOsArgs(t, conf, "service", "cat")
+					changeAppArgs(t, c, conf, "service", "cat")
 					err = c.Run()
 				}()
 
 				outCat = func() string {
 					return out.String()
 				}
-				stopCat = func() error {
+				stopCat = func() {
 					c.Quit()
 					<-done
 					logrus.StandardLogger().SetOutput(orig)
 					w.Close()
 					_, errCopy := io.Copy(&out, r)
 					require.NoError(t, errCopy, "Couldn’t copy stderr to buffer")
-					return errors.New("Mimic cat killing")
 				}
 			} else {
-
 				var err error
 				if tc.multipleCats {
 					outCat2, stopCat2, err = startCmd(t, false, "adsysctl", "-vv", "-c", conf, "service", "cat")
@@ -236,8 +233,7 @@ func TestServiceCat(t *testing.T) {
 				require.NoError(t, err, "version should run successfully")
 			}
 
-			err = stopCat()
-			require.Error(t, err, "cat has been killed")
+			stopCat()
 
 			if tc.wantErr {
 				assert.NotContains(t, outCat(), "New connection from client", "no internal logs from server are forwarded")
@@ -251,8 +247,7 @@ func TestServiceCat(t *testing.T) {
 			if tc.multipleCats {
 				// Give time for the server to forward first Cat closing
 				time.Sleep(time.Second)
-				err = stopCat2()
-				require.Error(t, err, "cat2 has been killed")
+				stopCat2()
 
 				assert.Contains(t, outCat2(), "New connection from client", "internal logs from server are forwarded")
 				assert.Contains(t, outCat2(), "New request /service/Cat", "debug logs for the other cat is forwarded")
@@ -264,7 +259,6 @@ func TestServiceCat(t *testing.T) {
 }
 
 func TestServiceStatus(t *testing.T) {
-
 	admock, err := filepath.Abs("../../internal/testutils/admock")
 	require.NoError(t, err, "Setup: Failed to get current absolute path for ad mock")
 	testutils.Setenv(t, "PYTHONPATH", admock)
@@ -281,13 +275,13 @@ func TestServiceStatus(t *testing.T) {
 
 		wantErr bool
 	}{
-		"Status with users and machines":          {systemAnswer: "yes"},
-		"Status offline cache":                    {dynamicADServerDomain: "offline", systemAnswer: "yes"},
-		"Status no user connected and no machine": {noCacheUsersMachine: true, systemAnswer: "yes"},
-		"Status is always authorized":             {systemAnswer: "no"},
-		"Status on user connected with no cache":  {krb5ccNoCache: true, systemAnswer: "yes"},
-		"Status with dynamic AD server":           {dynamicADServerDomain: "example.com", systemAnswer: "yes"},
-		"Status with empty dynamic AD server":     {dynamicADServerDomain: "online_no_active_server", systemAnswer: "yes"},
+		"Status with users and machines":          {systemAnswer: "polkit_yes"},
+		"Status offline cache":                    {dynamicADServerDomain: "offline", systemAnswer: "polkit_yes"},
+		"Status no user connected and no machine": {noCacheUsersMachine: true, systemAnswer: "polkit_yes"},
+		"Status is always authorized":             {systemAnswer: "polkit_no"},
+		"Status on user connected with no cache":  {krb5ccNoCache: true, systemAnswer: "polkit_yes"},
+		"Status with dynamic AD server":           {dynamicADServerDomain: "example.com", systemAnswer: "polkit_yes"},
+		"Status with empty dynamic AD server":     {dynamicADServerDomain: "online_no_active_server", systemAnswer: "polkit_yes"},
 
 		// Refresh time exception
 		"No startup time leads to unknown refresh time":           {systemAnswer: "no_startup_time"},
@@ -303,7 +297,7 @@ func TestServiceStatus(t *testing.T) {
 			systemAnswer(t, tc.systemAnswer)
 
 			adsysDir := t.TempDir()
-			gpoRulesDir := filepath.Join(adsysDir, "cache", "gpo_rules")
+			cachedPoliciesDir := filepath.Join(adsysDir, "cache", "policies")
 			conf := createConf(t, adsysDir)
 			if tc.dynamicADServerDomain != "" {
 				content, err := os.ReadFile(conf)
@@ -312,16 +306,20 @@ func TestServiceStatus(t *testing.T) {
 				if tc.dynamicADServerDomain != "offline" {
 					content = bytes.Replace(content, []byte("ad_server: adc.example.com"), []byte(""), 1)
 				}
-				err = os.WriteFile(conf, content, 0644)
+				err = os.WriteFile(conf, content, 0600)
 				require.NoError(t, err, "Setup: can’t rewrite configuration file")
 			}
 
 			// copy machine gpo rules for first update
 			if !tc.noCacheUsersMachine || tc.dynamicADServerDomain != "" {
-				err := os.MkdirAll(gpoRulesDir, 0700)
-				require.NoError(t, err, "Setup: couldn't create gpo_rules directory: %v", err)
-				err = shutil.CopyFile("testdata/PolicyApplied/gpo_rules/machine.yaml", filepath.Join(gpoRulesDir, hostname), false)
-				require.NoError(t, err, "Setup: failed to copy machine gporules cache")
+				err := os.MkdirAll(cachedPoliciesDir, 0700)
+				require.NoError(t, err, "Setup: couldn't create policies directory: %v", err)
+				require.NoError(t,
+					shutil.CopyTree(
+						filepath.Join("testdata", "PolicyApplied", "policies", "machine"),
+						filepath.Join(cachedPoliciesDir, hostname),
+						&shutil.CopyTreeOptions{Symlinks: true, CopyFunction: shutil.Copy}),
+					"Setup: failed to copy machine policies cache")
 			}
 
 			if !tc.daemonNotStarted {
@@ -338,20 +336,20 @@ func TestServiceStatus(t *testing.T) {
 			// Create users krb5cc and GPO caches
 			if !tc.noCacheUsersMachine {
 				krb5UserDir := filepath.Join(adsysDir, "run", "krb5cc")
-				err := os.MkdirAll(krb5UserDir, 0755)
+				err := os.MkdirAll(krb5UserDir, 0750)
 				require.NoError(t, err, "Setup: could not create gpo cache dir: %v", err)
 				for _, user := range []string{"user1@example.com", "user2@example.com"} {
 					f, err := os.Create(filepath.Join(krb5UserDir, user))
 					require.NoError(t, err, "Setup: could not create krb5 cache dir for %s: %v", user, err)
 					f.Close()
-					f, err = os.Create(filepath.Join(gpoRulesDir, user))
+					f, err = os.Create(filepath.Join(cachedPoliciesDir, user))
 					require.NoError(t, err, "Setup: could not create gpo cache dir for %s: %v", user, err)
 					f.Close()
 				}
 				// TODO: change modification time? (golden)
 			}
 			if tc.krb5ccNoCache {
-				err := os.RemoveAll(gpoRulesDir)
+				err := os.RemoveAll(cachedPoliciesDir)
 				require.NoError(t, err, "Setup: can’t delete gpo rules cache directory")
 			}
 
@@ -363,8 +361,8 @@ func TestServiceStatus(t *testing.T) {
 			require.NoError(t, err, "client should exit with no error")
 
 			// Make paths suitable for golden recording and comparison
-			re := regexp.MustCompile(`_.*/`)
-			got = re.ReplaceAllString(got, "_XXXXXX/")
+			re := regexp.MustCompile(`/tmp/.*/`)
+			got = re.ReplaceAllString(got, "/tmp/")
 
 			re = regexp.MustCompile(`(updated on)([^\n]*)`)
 			got = re.ReplaceAllString(got, "$1 DDD MON D HH:MM")
@@ -378,7 +376,7 @@ func TestServiceStatus(t *testing.T) {
 			// Update golden file
 			if update {
 				t.Logf("updating golden file %s", goldPath)
-				err = os.WriteFile(goldPath, []byte(got), 0644)
+				err = os.WriteFile(goldPath, []byte(got), 0600)
 				require.NoError(t, err, "Cannot write golden file")
 			}
 			want, err := os.ReadFile(goldPath)

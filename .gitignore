@@ -1,7 +1,7 @@
 # Binaries for programs, uncommited generated code and plugins
 cmd/adsysd/adsysd
 generated/
-internal/policies/ad/admxgen/admxgen
+internal/ad/admxgen/admxgen
 __pycache__/
 
 # Test binary, build with `go test -c`
@@ -26,3 +26,8 @@ debian/*debhelper*
 debian/adsys*
 debian/debhelper-build-stamp
 debian/files
+
+# Local testing
+/adsysd
+/adsysctl
+/adsys.yaml

@@ -1,3 +1,4 @@
+//go:build tools
 // +build tools
 
 package main
@@ -5,6 +6,7 @@ package main
 import (
 	"bufio"
 	"fmt"
+	"io/fs"
 	"log"
 	"os"
 	"os/exec"
@@ -64,7 +66,7 @@ func main() {
 	}
 }
 
-// createPo creates new po files
+// createPo creates new po files.
 func createPo(potfile, localeDir string, locs []string) error {
 	if _, err := os.Stat(potfile); err != nil {
 		return fmt.Errorf("%q can't be read: %v", potfile, err)
@@ -86,7 +88,7 @@ func createPo(potfile, localeDir string, locs []string) error {
 	return nil
 }
 
-// updatePo creates pot files and update any existing .po ones
+// updatePo creates pot files and update any existing .po ones.
 func updatePo(potfile, localeDir string) error {
 	if err := os.MkdirAll(localeDir, 0755); err != nil {
 		return fmt.Errorf("couldn't create directory for %q: %v", localeDir, err)
@@ -95,12 +97,12 @@ func updatePo(potfile, localeDir string) error {
 	// Create pot file
 	var files []string
 	root := filepath.Dir(localeDir)
-	err := filepath.Walk(root, func(p string, info os.FileInfo, err error) error {
+	err := filepath.WalkDir(root, func(p string, de fs.DirEntry, err error) error {
 		if err != nil {
 			return fmt.Errorf("fail to access %q: %v", p, err)
 		}
 		// Only deal with files
-		if info.IsDir() {
+		if de.IsDir() {
 			return nil
 		}
 

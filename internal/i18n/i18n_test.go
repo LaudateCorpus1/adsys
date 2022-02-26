@@ -48,8 +48,6 @@ msgstr "translated singular"
 )
 
 func TestTranslations(t *testing.T) {
-	t.Parallel()
-
 	defaultLocaleDir := filepath.Join(t.TempDir(), "locale")
 	compileMoFiles(t, defaultLocaleDir)
 
@@ -155,17 +153,18 @@ func compileMoFiles(t *testing.T, localeDir string) {
 
 	for loc, poContent := range localePo {
 		fullLocaleDir := filepath.Join(localeDir, loc, "LC_MESSAGES")
-		if err := os.MkdirAll(fullLocaleDir, 0755); err != nil {
+		if err := os.MkdirAll(fullLocaleDir, 0750); err != nil {
 			t.Fatalf("couldn't create temporary directory %q: %v", fullLocaleDir, err)
 		}
 
 		po := filepath.Join(localeDir, defaultDomain+".po")
 		mo := filepath.Join(fullLocaleDir, defaultDomain+".mo")
 
-		if err := os.WriteFile(po, []byte(poContent), 0644); err != nil {
+		if err := os.WriteFile(po, []byte(poContent), 0600); err != nil {
 			t.Fatalf("couldn't write po file: %v", err)
 		}
 
+		// nolint:gosec // G204 false positive, the binary is hardcoded
 		cmd := exec.Command("msgfmt", po, "--output-file", mo)
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr
@@ -180,7 +179,7 @@ func compileMoFiles(t *testing.T, localeDir string) {
 func renameElem(t *testing.T, old, new string) {
 	t.Helper()
 
-	if err := os.MkdirAll(filepath.Dir(new), 0755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(new), 0750); err != nil {
 		t.Fatalf("couldn't create parent directory %q to be renamed: %v", new, err)
 	}
 	if err := os.Rename(old, new); err != nil {

@@ -4,12 +4,14 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
 	"strings"
 	"time"
 
 	"github.com/godbus/dbus/v5"
 	"github.com/sirupsen/logrus"
 	"github.com/ubuntu/adsys"
+	"github.com/ubuntu/adsys/internal/ad"
 	"github.com/ubuntu/adsys/internal/authorizer"
 	"github.com/ubuntu/adsys/internal/consts"
 	"github.com/ubuntu/adsys/internal/daemon"
@@ -20,7 +22,6 @@ import (
 	log "github.com/ubuntu/adsys/internal/grpc/logstreamer"
 	"github.com/ubuntu/adsys/internal/i18n"
 	"github.com/ubuntu/adsys/internal/policies"
-	"github.com/ubuntu/adsys/internal/policies/ad"
 	"google.golang.org/grpc"
 	"gopkg.in/ini.v1"
 )
@@ -43,22 +44,27 @@ type Service struct {
 }
 
 type state struct {
-	cacheDir    string
-	runDir      string
-	dconfDir    string
-	sssCacheDir string
-	sssConf     string
+	cacheDir     string
+	runDir       string
+	dconfDir     string
+	sudoersDir   string
+	policyKitDir string
+	sssCacheDir  string
+	sssConf      string
 
 	adDomain string
 }
 
 type options struct {
-	cacheDir    string
-	runDir      string
-	dconfDir    string
-	sssCacheDir string
-	sssdConf    string
-	authorizer  authorizerer
+	cacheDir            string
+	runDir              string
+	dconfDir            string
+	sudoersDir          string
+	policyKitDir        string
+	sssCacheDir         string
+	sssdConf            string
+	defaultDomainSuffix string
+	authorizer          authorizerer
 }
 type option func(*options) error
 
@@ -66,7 +72,7 @@ type authorizerer interface {
 	IsAllowedFromContext(context.Context, authorizer.Action) error
 }
 
-// WithCacheDir specifies a personalized daemon cache directory
+// WithCacheDir specifies a personalized daemon cache directory.
 func WithCacheDir(p string) func(o *options) error {
 	return func(o *options) error {
 		o.cacheDir = p
@@ -74,7 +80,7 @@ func WithCacheDir(p string) func(o *options) error {
 	}
 }
 
-// WithRunDir specifies a personalized /run
+// WithRunDir specifies a personalized /run.
 func WithRunDir(p string) func(o *options) error {
 	return func(o *options) error {
 		o.runDir = p
@@ -82,7 +88,7 @@ func WithRunDir(p string) func(o *options) error {
 	}
 }
 
-// WithDconfDir specifies a personalized /etc/dconf
+// WithDconfDir specifies a personalized /etc/dconf.
 func WithDconfDir(p string) func(o *options) error {
 	return func(o *options) error {
 		o.dconfDir = p
@@ -90,10 +96,34 @@ func WithDconfDir(p string) func(o *options) error {
 	}
 }
 
-// WithSSSCacheDir specifies a personalized /
+// WithSudoersDir specifies a personalized sudoers directory.
+func WithSudoersDir(p string) func(o *options) error {
+	return func(o *options) error {
+		o.sudoersDir = p
+		return nil
+	}
+}
+
+// WithPolicyKitDir specifies a personalized policykit directory.
+func WithPolicyKitDir(p string) func(o *options) error {
+	return func(o *options) error {
+		o.policyKitDir = p
+		return nil
+	}
+}
+
+// WithSSSCacheDir specifies a personalized /.
 func WithSSSCacheDir(p string) func(o *options) error {
 	return func(o *options) error {
 		o.sssCacheDir = p
+		return nil
+	}
+}
+
+// WithDefaultDomainSuffix specifies a personalized default domain suffix.
+func WithDefaultDomainSuffix(d string) func(o *options) error {
+	return func(o *options) error {
+		o.defaultDomainSuffix = d
 		return nil
 	}
 }
@@ -115,6 +145,24 @@ func New(ctx context.Context, url, domain string, opts ...option) (s *Service, e
 		}
 	}
 
+	// Create run and cache base directories
+	runDir := args.runDir
+	if runDir == "" {
+		runDir = consts.DefaultRunDir
+	}
+	// #nosec G301 - we need to ensure users have access directly to their own scripts
+	if err := os.MkdirAll(runDir, 0755); err != nil {
+		return nil, err
+	}
+
+	cacheDir := args.cacheDir
+	if cacheDir == "" {
+		cacheDir = consts.DefaultCacheDir
+	}
+	if err := os.MkdirAll(cacheDir, 0700); err != nil {
+		return nil, err
+	}
+
 	// Don’t call dbus.SystemBus which caches globally system dbus (issues in tests)
 	bus, err := dbus.SystemBusPrivate()
 	if err != nil {
@@ -129,7 +177,7 @@ func New(ctx context.Context, url, domain string, opts ...option) (s *Service, e
 		return nil, err
 	}
 
-	url, domain, err = loadServerInfo(args.sssdConf, url, domain)
+	url, domain, defaultDomainSuffix, err := loadServerInfo(args.sssdConf, url, domain, args.defaultDomainSuffix)
 	if err != nil {
 		return nil, err
 	}
@@ -143,6 +191,9 @@ func New(ctx context.Context, url, domain string, opts ...option) (s *Service, e
 	}
 	if args.sssCacheDir != "" {
 		adOptions = append(adOptions, ad.WithSSSCacheDir(args.sssCacheDir))
+	}
+	if defaultDomainSuffix != "" {
+		adOptions = append(adOptions, ad.WithDefaultDomainSuffix(defaultDomainSuffix))
 	}
 	adc, err := ad.New(ctx, url, domain, bus, adOptions...)
 	if err != nil {
@@ -165,7 +216,16 @@ func New(ctx context.Context, url, domain string, opts ...option) (s *Service, e
 	if args.dconfDir != "" {
 		policyOptions = append(policyOptions, policies.WithDconfDir(args.dconfDir))
 	}
-	m, err := policies.New(policyOptions...)
+	if args.sudoersDir != "" {
+		policyOptions = append(policyOptions, policies.WithSudoersDir(args.sudoersDir))
+	}
+	if args.policyKitDir != "" {
+		policyOptions = append(policyOptions, policies.WithPolicyKitDir(args.policyKitDir))
+	}
+	if args.runDir != "" {
+		policyOptions = append(policyOptions, policies.WithRunDir(args.runDir))
+	}
+	m, err := policies.NewManager(bus, policyOptions...)
 	if err != nil {
 		return nil, err
 	}
@@ -178,36 +238,42 @@ func New(ctx context.Context, url, domain string, opts ...option) (s *Service, e
 		policyManager: m,
 		authorizer:    args.authorizer,
 		state: state{
-			cacheDir:    args.cacheDir,
-			dconfDir:    args.dconfDir,
-			runDir:      args.runDir,
-			sssCacheDir: args.sssCacheDir,
-			adDomain:    domain,
+			cacheDir:     args.cacheDir,
+			dconfDir:     args.dconfDir,
+			sudoersDir:   args.sudoersDir,
+			policyKitDir: args.policyKitDir,
+			runDir:       args.runDir,
+			sssCacheDir:  args.sssCacheDir,
+			adDomain:     domain,
 		},
 		initSystemTime: initSysTime,
 		bus:            bus,
 	}, nil
 }
 
-func loadServerInfo(sssdConf, url, domain string) (rurl string, rdomain string, err error) {
+func loadServerInfo(sssdConf, url, domain, defaultDomainSuffix string) (rurl string, rdomain string, rdefaultDomainSuffix string, err error) {
 	defer decorate.OnError(&err, i18n.G("can't load server info from %s"), sssdConf)
 
-	if url != "" && domain != "" {
-		return url, domain, nil
+	if url != "" && domain != "" && defaultDomainSuffix != "" {
+		return url, domain, defaultDomainSuffix, nil
 	}
 
 	cfg, err := ini.Load(sssdConf)
 	if err != nil {
-		// Allow autodiscovery for server if domain was manually set.
+		// Return parameters to server if we have a domain.
+		// In case url is empty, we will try auto discovery.
 		if domain != "" {
-			return "", domain, nil
+			return url, domain, defaultDomainSuffix, nil
 		}
-		return "", "", fmt.Errorf(i18n.G("can't read sssd.conf and no url or domain provided: %v"), err)
+		return "", "", "", fmt.Errorf(i18n.G("can't read sssd.conf and no url or domain provided: %v"), err)
+	}
+	if defaultDomainSuffix == "" {
+		defaultDomainSuffix = cfg.Section("sssd").Key("default_domain_suffix").String()
 	}
 	if domain == "" {
 		domain = strings.Split(cfg.Section("sssd").Key("domains").String(), ",")[0]
 		if domain == "" {
-			return "", "", errors.New(i18n.G("failed to find default domain in sssd.conf and domain is not provided"))
+			return "", "", "", errors.New(i18n.G("failed to find default domain in sssd.conf and domain is not provided"))
 		}
 	}
 	// domain is either domain section provided by the user or read in sssd.conf
@@ -221,11 +287,11 @@ func loadServerInfo(sssdConf, url, domain string) (rurl string, rdomain string, 
 		domain = adDomain
 	}
 
-	return url, domain, nil
+	return url, domain, defaultDomainSuffix, nil
 }
 
 // RegisterGRPCServer registers our service with the new interceptor chains.
-// It will notify the daemon of any new connection
+// It will notify the daemon of any new connection.
 func (s *Service) RegisterGRPCServer(d *daemon.Daemon) *grpc.Server {
 	s.logger = logrus.StandardLogger()
 	srv := grpc.NewServer(grpc.StreamInterceptor(
@@ -246,7 +312,7 @@ func (s *Service) Quit(ctx context.Context) {
 	}
 }
 
-// initSystemTime returns systemd generator init system time
+// initSystemTime returns systemd generator init system time.
 func initSystemTime(bus *dbus.Conn) *time.Time {
 	systemd := bus.Object("org.freedesktop.systemd1", "/org/freedesktop/systemd1")
 	val, err := systemd.GetProperty("org.freedesktop.systemd1.Manager.GeneratorsStartTimestamp")

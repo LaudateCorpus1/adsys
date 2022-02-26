@@ -70,6 +70,12 @@ func (s *Service) Status(r *adsys.Empty, stream adsys.Service_StatusServer) (err
 	if state.dconfDir == "" {
 		state.dconfDir = consts.DefaultDconfDir
 	}
+	if state.sudoersDir == "" {
+		state.sudoersDir = consts.DefaultSudoersDir
+	}
+	if state.policyKitDir == "" {
+		state.policyKitDir = consts.DefaultPolicyKitDir
+	}
 	if state.sssCacheDir == "" {
 		state.sssCacheDir = consts.DefaultSSSCacheDir
 	}
@@ -146,10 +152,13 @@ Daemon:
   Listening on: %s
   Cache path: %s
   Run path: %s
-  Dconf path: %s`), offline, updateMachine, updateUsers, nextRefresh,
+  Dconf path: %s
+  Sudoers path: %s
+  PolicyKit path: %s`), offline, updateMachine, updateUsers, nextRefresh,
 		adServerURL, state.adDomain,
 		state.sssConf, state.sssCacheDir,
-		timeout, socket, state.cacheDir, state.runDir, state.dconfDir)
+		timeout, socket, state.cacheDir, state.runDir, state.dconfDir,
+		state.sudoersDir, state.policyKitDir)
 
 	if err := stream.Send(&adsys.StringResponse{
 		Msg: status,
@@ -194,7 +203,7 @@ func (s *Service) ListActiveUsers(r *adsys.Empty, stream adsys.Service_ListActiv
 	return nil
 }
 
-// nextRefreshTime returns next adsys schedule refresh call
+// nextRefreshTime returns next adsys schedule refresh call.
 func (s Service) nextRefreshTime() (next *time.Time, err error) {
 	defer decorate.OnError(&err, i18n.G("error while trying to determine next refresh time"))
 

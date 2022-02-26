@@ -44,17 +44,17 @@
 #include <security/pam_ext.h>
 #include <security/_pam_macros.h>
 
-#define ADSYS_GPO_RULES_DIR "/var/cache/adsys/gpo_rules/%s"
+#define ADSYS_POLICIES_DIR "/var/cache/adsys/policies/%s"
 
 /*
  * Refresh the group policies of current user
  */
-static int update_policy(pam_handle_t * pamh, const char *username, int debug)
+static int update_policy(pam_handle_t * pamh, const char *username, const char *krb5ccname, int debug)
 {
-	const char *krb5ccname = pam_getenv(pamh, "KRB5CCNAME");
-	if (krb5ccname == NULL) {
-		pam_syslog(pamh, LOG_ERR, "KRB5CCNAME is not set");
-		return PAM_ABORT;
+	int retval;
+	retval = pam_info(pamh, "Applying user settings");
+	if (retval != PAM_SUCCESS) {
+		return retval;
 	}
 
 	if (memcmp(krb5ccname, (const char *)"FILE:", 5) == 0) {
@@ -127,6 +127,7 @@ static int update_policy(pam_handle_t * pamh, const char *username, int debug)
 		execv(arggv[0], arggv);
 		int i = errno;
 		pam_syslog(pamh, LOG_ERR, "execv(%s,...) failed: %m", arggv[0]);
+		free(arggv);
 		_exit(i);
 	}
 
@@ -138,6 +139,12 @@ static int update_policy(pam_handle_t * pamh, const char *username, int debug)
  */
 static int update_machine_policy(pam_handle_t * pamh, int debug)
 {
+	int retval;
+	retval = pam_info(pamh, "Applying machine settings");
+	if (retval != PAM_SUCCESS) {
+		return retval;
+	}
+
 	char **arggv;
 	arggv = calloc(5, sizeof(char *));
 	if (arggv == NULL) {
@@ -201,6 +208,7 @@ static int update_machine_policy(pam_handle_t * pamh, int debug)
 		execv(arggv[0], arggv);
 		int i = errno;
 		pam_syslog(pamh, LOG_ERR, "execv(%s,...) failed: %m", arggv[0]);
+		free(arggv);
 		_exit(i);
 	}
 
@@ -260,10 +268,13 @@ pam_sm_open_session(pam_handle_t * pamh, int flags, int argc, const char **argv)
 		return PAM_SYSTEM_ERR;	/* let pam_get_item() log the error */
 	}
 
-	/* check if it is a local or remote use
-	 * is there a better/more reliable way?
+	/*
+	 * We consider that KRB5CCNAME is always set by SSSD for remote users
+	 * We do an exception for GDM which is handled by the machine's GPO
+	 * and we must set the DCONF_PROFILE environment variable.
 	 */
-	if (strchr(username, '@') == NULL && strcmp(username, "gdm") != 0) {
+	const char *krb5ccname = pam_getenv(pamh, "KRB5CCNAME");
+	if (krb5ccname == NULL && strcmp(username, "gdm") != 0) {
 		return PAM_IGNORE;
 	}
 
@@ -276,7 +287,7 @@ pam_sm_open_session(pam_handle_t * pamh, int flags, int argc, const char **argv)
 	/*
 	  update user policy is only for AD users.
 	*/
-	if (strchr(username, '@') == NULL) {
+	if (strcmp(username, "gdm") == 0) {
 		return PAM_IGNORE;
 	}
 
@@ -284,12 +295,12 @@ pam_sm_open_session(pam_handle_t * pamh, int flags, int argc, const char **argv)
 	  trying to update machine policy first if no machine gpo cache (meaning adsysd boot service failed due to being offline for instance)
 	*/
 	char hostname[HOST_NAME_MAX + 1];
-	char cache_path[HOST_NAME_MAX + 1 + strlen(ADSYS_GPO_RULES_DIR) - 2];
-    if (gethostname(hostname, HOST_NAME_MAX + 1) < 0) {
+	char cache_path[HOST_NAME_MAX + 1 + strlen(ADSYS_POLICIES_DIR) - 2];
+	if (gethostname(hostname, HOST_NAME_MAX + 1) < 0) {
 		pam_syslog(pamh, LOG_ERR, "Failed to get hostname");
 		return PAM_SYSTEM_ERR;
-    }
-	if (sprintf(cache_path, ADSYS_GPO_RULES_DIR, hostname) < 0) {
+	}
+	if (sprintf(cache_path, ADSYS_POLICIES_DIR, hostname) < 0) {
 		pam_syslog(pamh, LOG_ERR, "Failed to allocate cache_path");
 		return PAM_BUF_ERR;
 	}
@@ -301,7 +312,7 @@ pam_sm_open_session(pam_handle_t * pamh, int flags, int argc, const char **argv)
 		}
 	}
 
-	return update_policy(pamh, username, debug);
+	return update_policy(pamh, username, krb5ccname, debug);
 }
 
 PAM_EXTERN int

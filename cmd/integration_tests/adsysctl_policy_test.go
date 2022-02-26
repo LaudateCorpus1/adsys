@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"bytes"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"os/user"
@@ -28,16 +27,16 @@ func TestPolicyAdmx(t *testing.T) {
 
 		wantErr bool
 	}{
-		"LTS only content":               {arg: "lts-only", systemAnswer: "yes"},
-		"All supported releases content": {arg: "all", systemAnswer: "yes"},
+		"LTS only content":               {arg: "lts-only", systemAnswer: "polkit_yes"},
+		"All supported releases content": {arg: "all", systemAnswer: "polkit_yes"},
 
-		"Accept distro option": {arg: "lts-only", distroOption: "Ubuntu", systemAnswer: "yes"},
+		"Accept distro option": {arg: "lts-only", distroOption: "Ubuntu", systemAnswer: "polkit_yes"},
 
-		"Need one valid argument": {systemAnswer: "yes", wantErr: true},
+		"Need one valid argument": {systemAnswer: "polkit_yes", wantErr: true},
 
-		"Admx generation is always allowed": {arg: "lts-only", systemAnswer: "no"},
-		"Fail on non stored distro":         {arg: "lts-only", distroOption: "Tartanpion", systemAnswer: "yes", wantErr: true},
-		"Fail on invalid arg":               {arg: "something", systemAnswer: "yes", wantErr: true},
+		"Admx generation is always allowed": {arg: "lts-only", systemAnswer: "polkit_no"},
+		"Fail on non stored distro":         {arg: "lts-only", distroOption: "Tartanpion", systemAnswer: "polkit_yes", wantErr: true},
+		"Fail on invalid arg":               {arg: "something", systemAnswer: "polkit_yes", wantErr: true},
 		"Daemon not responding":             {arg: "lts-only", daemonNotStarted: true, wantErr: true},
 	}
 	for name, tc := range tests {
@@ -77,61 +76,89 @@ func TestPolicyAdmx(t *testing.T) {
 }
 
 func TestPolicyApplied(t *testing.T) {
+	currentUser := "adsystestuser@example.com"
+
+	// We setup and rerun in a subprocess because the test users must exist on the machine for the authorizer.
+	if setupSubprocessForTest(t, currentUser, "UserIntegrationTest@example.com") {
+		return
+	}
+
 	hostname, err := os.Hostname()
-	require.NoError(t, err, "Setup: failed to get current user")
-	user, err := user.Current()
-	require.NoError(t, err, "Setup: failed to get current user")
-	currentUser := user.Username
+	require.NoError(t, err, "Setup: failed to get current hostname")
 
 	tests := map[string]struct {
-		args              []string
-		systemAnswer      string
-		daemonNotStarted  bool
-		userGPORules      string
-		noMachineGPORules bool
+		args                  []string
+		defaultADDomainSuffix string
+		systemAnswer          string
+		daemonNotStarted      bool
+		userGPORules          string
+		noMachineGPORules     bool
 
 		wantErr bool
 	}{
-		"Current user applied gpos": {systemAnswer: "yes"},
-		// we use user "root" here as another user because the test user must exist on the machine for the authorizer.
-		"Other user applied gpos":   {args: []string{"root"}, userGPORules: "root", systemAnswer: "yes"},
-		"Machine only applied gpos": {args: []string{hostname}, systemAnswer: "yes"},
+		"Current user applied gpos": {},
+		"Other user applied gpos":   {args: []string{"UserIntegrationTest@example.com"}, userGPORules: "UserIntegrationTest@example.com"},
+		"Machine only applied gpos": {args: []string{hostname}},
 
-		"Detailed policy without override":               {args: []string{"--details"}, systemAnswer: "yes"},
-		"Detailed policy with overrides (all)":           {args: []string{"--all"}, systemAnswer: "yes"},
-		"Current user gpos no color":                     {args: []string{"--no-color"}, systemAnswer: "yes"},
-		"Detailed policy with overrides (all), no color": {args: []string{"--no-color", "--all"}, systemAnswer: "yes"},
+		"Detailed policy without override":               {args: []string{"--details"}},
+		"Detailed policy with overrides (all)":           {args: []string{"--all"}},
+		"Current user gpos no color":                     {args: []string{"--no-color"}},
+		"Detailed policy with overrides (all), no color": {args: []string{"--no-color", "--all"}},
+
+		// User options
+		`Current user with domain\username`:           {args: []string{`example.com\adsystestuser`}},
+		`Current user with default domain completion`: {args: []string{`adsystestuser`}, defaultADDomainSuffix: "example.com"},
 
 		// Error cases
-		"Machine cache not available": {noMachineGPORules: true, systemAnswer: "yes", wantErr: true},
-		"User cache not available":    {userGPORules: "-", systemAnswer: "yes", wantErr: true},
-		"Applied denied":              {systemAnswer: "no", wantErr: true},
-		"Daemon not responding":       {daemonNotStarted: true, wantErr: true},
+		"Machine cache not available":                             {noMachineGPORules: true, wantErr: true},
+		"User cache not available":                                {userGPORules: "-", wantErr: true},
+		"Error on unexisting user":                                {args: []string{"doesnotexists@example.com"}, wantErr: true},
+		"Error on user name without domain and no default domain": {args: []string{"doesnotexists"}, wantErr: true},
+		"Applied denied":                                          {systemAnswer: "polkit_no", wantErr: true},
+		"Daemon not responding":                                   {daemonNotStarted: true, wantErr: true},
 	}
 	for name, tc := range tests {
 		tc := tc
 		t.Run(name, func(t *testing.T) {
+			if tc.systemAnswer == "" {
+				tc.systemAnswer = "polkit_yes"
+			}
 			systemAnswer(t, tc.systemAnswer)
 
 			// Reset color that we disable on client when we request --no-color
 			color.NoColor = false
 
 			dir := t.TempDir()
-			dstDir := filepath.Join(dir, "cache", "gpo_rules")
+			dstDir := filepath.Join(dir, "cache", "policies")
 			err := os.MkdirAll(dstDir, 0700)
-			require.NoError(t, err, "setup failed: couldn't create gpo_rules directory: %v", err)
+			require.NoError(t, err, "setup failed: couldn't create policies directory: %v", err)
 			if !tc.noMachineGPORules {
-				err := shutil.CopyFile("testdata/PolicyApplied/gpo_rules/machine.yaml", filepath.Join(dstDir, hostname), false)
-				require.NoError(t, err, "Setup: failed to copy machine gporules cache")
+				require.NoError(t,
+					shutil.CopyTree(
+						filepath.Join("testdata", "PolicyApplied", "policies", "machine"),
+						filepath.Join(dstDir, hostname),
+						&shutil.CopyTreeOptions{Symlinks: true, CopyFunction: shutil.Copy}),
+					"Setup: failed to copy machine policies cache")
 			}
 			if tc.userGPORules != "-" {
 				if tc.userGPORules == "" {
 					tc.userGPORules = currentUser
 				}
-				err := shutil.CopyFile("testdata/PolicyApplied/gpo_rules/user.yaml", filepath.Join(dstDir, tc.userGPORules), false)
-				require.NoError(t, err, "Setup: failed to copy user gporules cache")
+				require.NoError(t,
+					shutil.CopyTree(
+						filepath.Join("testdata", "PolicyApplied", "policies", "user"),
+						filepath.Join(dstDir, tc.userGPORules),
+						&shutil.CopyTreeOptions{Symlinks: true, CopyFunction: shutil.Copy}),
+					"Setup: failed to copy user policies cache")
 			}
 			conf := createConf(t, dir)
+			if tc.defaultADDomainSuffix != "" {
+				content, err := os.ReadFile(conf)
+				require.NoError(t, err, "Setup: can't read configuration file")
+				content = append(content, []byte("\nad_default_domain_suffix: example.com")...)
+				err = os.WriteFile(conf, content, 0600)
+				require.NoError(t, err, "Setup: can't rewrite configuration file")
+			}
 			if !tc.daemonNotStarted {
 				defer runDaemon(t, conf)()
 			}
@@ -153,7 +180,7 @@ func TestPolicyApplied(t *testing.T) {
 			// Update golden file
 			if update {
 				t.Logf("updating golden file %s", goldPath)
-				err = os.WriteFile(goldPath, []byte(got), 0644)
+				err = os.WriteFile(goldPath, []byte(got), 0600)
 				require.NoError(t, err, "Cannot write golden file")
 			}
 			want, err := os.ReadFile(goldPath)
@@ -167,80 +194,17 @@ func TestPolicyApplied(t *testing.T) {
 func TestPolicyUpdate(t *testing.T) {
 	currentUser := "adsystestuser@example.com"
 
-	// Reexec ourself, with a mock passwd file
-	if os.Getenv("GO_WANT_HELPER_PROCESS") != "1" {
-		err := exec.Command("pkg-config", "--exists", "nss_wrapper").Run()
-		require.NoError(t, err, "libnss_wrapper is not installed on disk, either skip integration tests or install it")
+	u, err := user.Current()
+	require.NoError(t, err, "Setup: can't get current user")
+	currentUID := u.Uid
 
-		testutils.PythonCoverageToGoFormat(t, "../../internal/policies/ad/adsys-gpolist", true)
-
-		var subArgs []string
-		// We are going to only reexec ourself: only take options (without -run)
-		// and redirect coverage file
-		var hasPolicyUpdateAsRun bool
-		for i, arg := range os.Args {
-			if i != 0 && !strings.HasPrefix(arg, "-") {
-				continue
-			}
-			if strings.HasPrefix(arg, "-test.run=") {
-				if !strings.HasPrefix(arg, "-test.run=TestPolicyUpdate") {
-					continue
-				}
-				hasPolicyUpdateAsRun = true
-			}
-			// Cover subprocess in a different file that we will merge when the test ends
-			if strings.HasPrefix(arg, "-test.coverprofile=") {
-				coverage := strings.TrimPrefix(arg, "-test.coverprofile=")
-				coverage = fmt.Sprintf("%s.testpolicyupdate", coverage)
-				arg = fmt.Sprintf("-test.coverprofile=%s", coverage)
-				testutils.AddCoverageFile(coverage)
-			}
-			subArgs = append(subArgs, arg)
-		}
-		if !hasPolicyUpdateAsRun {
-			subArgs = append(subArgs, "-test.run=TestPolicyUpdate")
-		}
-
-		cmd := exec.Command(subArgs[0], subArgs[1:]...)
-
-		admock, err := filepath.Abs("../../internal/testutils/admock")
-		require.NoError(t, err, "Setup: Failed to get current absolute path for ad mock")
-
-		passwd := modifyAndAddUsers(t, currentUser, "UserIntegrationTest@example.com")
-
-		// Setup correct child environment, including LD_PRELOAD for nss mock
-		cmd.Env = append(os.Environ(),
-			"GO_WANT_HELPER_PROCESS=1",
-
-			// dbus addresses to be reset in child
-			fmt.Sprintf("DBUS_SYSTEM_BUS_ADDRESS_YES=%s", systemSockets["yes"]),
-			fmt.Sprintf("DBUS_SYSTEM_BUS_ADDRESS_NO=%s", systemSockets["no"]),
-
-			// mock for ad python samba code
-			fmt.Sprintf("PYTHONPATH=%s", admock),
-
-			// override user and host database
-			"LD_PRELOAD=libnss_wrapper.so",
-			fmt.Sprintf("NSS_WRAPPER_PASSWD=%s", passwd),
-			"NSS_WRAPPER_GROUP=/etc/group",
-		)
-
-		cmd.Stderr = os.Stderr
-		cmd.Stdout = os.Stdout
-		err = cmd.Run()
-		if err != nil {
-			t.Fail() // The real failure will be written by the child test process
-		}
-
+	// We setup and rerun in a subprocess because the test users must exist on the machine for the authorizer.
+	if setupSubprocessForTest(t, currentUser, "UserIntegrationTest@example.com") {
 		return
 	}
 
-	// Real test (in a subprocess, with coverage report when enabled in main one)
-
-	// Restore for subprocess the yes and no socket to connect to polkitd
-	systemSockets = make(map[string]string)
-	systemSockets["yes"] = os.Getenv("DBUS_SYSTEM_BUS_ADDRESS_YES")
-	systemSockets["no"] = os.Getenv("DBUS_SYSTEM_BUS_ADDRESS_NO")
+	testutils.Setenv(t, "ADSYS_TESTS_MOCK_SMBDOMAIN", "example.com")
+	testutils.Setenv(t, "ADSYS_SKIP_ROOT_CALLS", "TRUE")
 
 	hostname, err := os.Hostname()
 	require.NoError(t, err, "Setup: failed to get current host")
@@ -259,7 +223,9 @@ func TestPolicyUpdate(t *testing.T) {
 		krb5ccname            string
 		krb5ccNamesState      []krb5ccNamesWithState
 		clearDirs             []string // Removes already generated system files eg dconf db, apparmor profiles, ...
+		readOnlyDirs          []string
 		dynamicADServerDomain string
+		defaultADDomainSuffix string
 
 		wantErr bool
 	}{
@@ -394,7 +360,7 @@ func TestPolicyUpdate(t *testing.T) {
 		},
 
 		// no AD connection
-		"Host is offline, get from cache (no update)": {
+		"Host is offline, get user from cache (no update)": {
 			dynamicADServerDomain: "offline",
 			initState:             "old-data",
 			krb5ccNamesState: []krb5ccNamesWithState{
@@ -409,13 +375,14 @@ func TestPolicyUpdate(t *testing.T) {
 				},
 			},
 		},
-		"Host is offline, regenerate from old data": {
+		"Host is offline, regenerate user from old data": {
 			dynamicADServerDomain: "offline",
 			initState:             "old-data",
-			// clean generate dconf dbs to regenerate
+			// clean generate dconf dbs and privilege files to regenerate
 			clearDirs: []string{
-				"dconf/db/adsystestuser@offline.d",
-				"dconf/profile/adsystestuser@offline",
+				"dconf/db/adsystestuser@example.com.d",
+				"dconf/profile/adsystestuser@example.com",
+				"run/users/1000",
 			},
 			krb5ccNamesState: []krb5ccNamesWithState{
 				{
@@ -429,22 +396,78 @@ func TestPolicyUpdate(t *testing.T) {
 				},
 			},
 		},
-		"Host is offline, gpos cache is cleared, with gpo_rules cache": {
+		"Host is offline, sysvol cache is cleared, use user cache": {
 			dynamicADServerDomain: "offline",
 			initState:             "old-data",
-			// clean gpos cache, but keep machine ones and user gpo_rules
+			// clean sysvol cache, but keep machine ones and user policies
 			clearDirs: []string{
-				"dconf/db/adsystestuser@offline.d",
-				"dconf/profile/adsystestuser@offline",
-				"cache/gpo_cache/{5EC4DF8F-FF4E-41DE-846B-52AA6FFAF242}",
-				"cache/gpo_cache/{073AA7FC-5C1A-4A12-9AFC-42EC9C5CAF04}",
-				"cache/gpo_cache/{75545F76-DEC2-4ADA-B7B8-D5209FD48727}",
+				"dconf/db/adsystestuser@example.com.d",
+				"dconf/profile/adsystestuser@example.com",
+				"run/users/1000",
+				"cache/sysvol/Policies/{5EC4DF8F-FF4E-41DE-846B-52AA6FFAF242}",
+				"cache/sysvol/Policies/{073AA7FC-5C1A-4A12-9AFC-42EC9C5CAF04}",
+				"cache/sysvol/Policies/{75545F76-DEC2-4ADA-B7B8-D5209FD48727}",
+				"cache/sysvol/assets",
+				"cache/sysvol/assets.db",
 			},
 			krb5ccNamesState: []krb5ccNamesWithState{
 				{
 					src:          currentUser + ".krb5",
 					adsysSymlink: currentUser,
 				},
+				{
+					src:          "ccache_EXAMPLE.COM",
+					adsysSymlink: hostname,
+					machine:      true,
+				},
+			},
+		},
+		"Host is offline, get machine from cache (no update)": {
+			args:                  []string{"-m"},
+			dynamicADServerDomain: "offline",
+			initState:             "old-data",
+			krb5ccNamesState: []krb5ccNamesWithState{
+				{
+					src:          "ccache_EXAMPLE.COM",
+					adsysSymlink: hostname,
+					machine:      true,
+				},
+			},
+		},
+		"Host is offline, regenerate machine from old data": {
+			args:                  []string{"-m"},
+			dynamicADServerDomain: "offline",
+			initState:             "old-data",
+			// clean generate dconf dbs and privilege files to regenerate
+			clearDirs: []string{
+				"dconf/db/machine.d",
+				"dconf/profile/gdm",
+				"sudoers.d",
+				"polkit-1",
+			},
+			krb5ccNamesState: []krb5ccNamesWithState{
+				{
+					src:          "ccache_EXAMPLE.COM",
+					adsysSymlink: hostname,
+					machine:      true,
+				},
+			},
+		},
+		"Host is offline, mach gpos cache is cleared, with policies cache": {
+			args:                  []string{"-m"},
+			dynamicADServerDomain: "offline",
+			initState:             "old-data",
+			// clean gpos cache, but keep machine ones and user policies
+			clearDirs: []string{
+				"dconf/db/machine.d",
+				"dconf/profile/gdm",
+				"sudoers.d",
+				"polkit-1",
+				"cache/sysvol/Policies/{C4F393CA-AD9A-4595-AEBC-3FA6EE484285}",
+				"cache/sysvol/Policies/{B8D10A86-0B78-4899-91AF-6F0124ECEB48}",
+				"cache/sysvol/Policies/{75545F76-DEC2-4ADA-B7B8-D5209FD48727}",
+			},
+			krb5ccNamesState: []krb5ccNamesWithState{
 				{
 					src:          "ccache_EXAMPLE.COM",
 					adsysSymlink: hostname,
@@ -497,11 +520,34 @@ func TestPolicyUpdate(t *testing.T) {
 			},
 		},
 
+		// User options
+		`Current user with domain\username`: {
+			initState: "localhost-uptodate",
+			args:      []string{`example.com\adsystestuser`, "adsystestuser@example.com.krb5"},
+		},
+		`Current user with default domain completion`: {
+			initState:             "localhost-uptodate",
+			args:                  []string{`adsystestuser`, "adsystestuser@example.com.krb5"},
+			defaultADDomainSuffix: "example.com",
+		},
+
+		// subscriptions
+		"No subscription means dconf only": {
+			systemAnswer: "subscription_disabled",
+			args:         []string{"-m"},
+			krb5ccname:   "-",
+			krb5ccNamesState: []krb5ccNamesWithState{
+				{
+					src:     "ccache_EXAMPLE.COM",
+					machine: true,
+				},
+			}},
+
 		// Error cases
 		"User needs machine to be updated": {wantErr: true},
-		"Polkit denied updating self":      {systemAnswer: "no", initState: "localhost-uptodate", wantErr: true},
-		"Polkit denied updating other":     {systemAnswer: "no", args: []string{"UserIntegrationTest@example.com", "FIXME"}, initState: "localhost-uptodate", wantErr: true},
-		"Polkit denied updating machine":   {systemAnswer: "no", args: []string{"-m"}, wantErr: true},
+		"Polkit denied updating self":      {systemAnswer: "polkit_no", initState: "localhost-uptodate", wantErr: true},
+		"Polkit denied updating other":     {systemAnswer: "polkit_no", args: []string{"UserIntegrationTest@example.com", "FIXME"}, initState: "localhost-uptodate", wantErr: true},
+		"Polkit denied updating machine":   {systemAnswer: "polkit_no", args: []string{"-m"}, wantErr: true},
 		"Error on dynamic AD returning nothing": {
 			initState:             "localhost-uptodate",
 			dynamicADServerDomain: "online_no_active_server",
@@ -515,14 +561,33 @@ func TestPolicyUpdate(t *testing.T) {
 			},
 			wantErr: true,
 		},
-		"Error on host is offline, without gpo_rules": {
+		"Error on privilege apply failing": {
+			args:       []string{"-m"},
+			krb5ccname: "-",
+			krb5ccNamesState: []krb5ccNamesWithState{
+				{
+					src:     "ccache_EXAMPLE.COM",
+					machine: true,
+				},
+			},
+			initState: "localhost-uptodate",
+			// this generates an error when parent directories are not writable
+			readOnlyDirs: []string{
+				"sudoers.d",
+				"polkit-1",
+			},
+			wantErr: true,
+		},
+		"Error on host is offline, without policies": {
 			dynamicADServerDomain: "offline",
 			initState:             "old-data",
-			// clean gpos rules, but gpo_cache
+			// clean gpos rules, but sysvol/ directory
 			clearDirs: []string{
 				"dconf/db/adsystestuser@example.com.d",
 				"dconf/profile/adsystestuser@example.com",
-				"cache/gpo_rules/adsystestuser@example.com",
+				"sudoers.d",
+				"polkit-1",
+				"cache/policies/adsystestuser@example.com",
 			},
 			krb5ccNamesState: []krb5ccNamesWithState{
 				{
@@ -698,12 +763,22 @@ func TestPolicyUpdate(t *testing.T) {
 			},
 			wantErr: true,
 		},
+		"Error on unexisting user": {
+			initState: "localhost-uptodate",
+			args:      []string{"doesnotexists@example.com", "adsystestuser@example.com.krb5"},
+			wantErr:   true,
+		},
+		"Error on user name without domain and no default domain": {
+			initState: "localhost-uptodate",
+			args:      []string{"doesnotexists", "adsystestuser@example.com.krb5"},
+			wantErr:   true,
+		},
 	}
 	for name, tc := range tests {
 		tc := tc
 		t.Run(name, func(t *testing.T) {
 			if tc.systemAnswer == "" {
-				tc.systemAnswer = "yes"
+				tc.systemAnswer = "polkit_yes"
 			}
 			systemAnswer(t, tc.systemAnswer)
 
@@ -714,25 +789,30 @@ func TestPolicyUpdate(t *testing.T) {
 				// Copytree dest directory should not exists
 				err = os.Remove(adsysDir)
 				require.NoError(t, err, "Setup: could not remove adsysDir")
-				copyRenameHost := func(src, dst string, followSymlinks bool) (string, error) {
-					if filepath.Base(src) == "HOST" {
-						dst = filepath.Join(filepath.Dir(dst), hostname)
-					}
-					return shutil.Copy(src, dst, followSymlinks)
-				}
-				err := shutil.CopyTree(filepath.Join("testdata", "PolicyUpdate", "states", tc.initState), adsysDir, &shutil.CopyTreeOptions{CopyFunction: copyRenameHost})
+				err := shutil.CopyTree(filepath.Join("testdata", "PolicyUpdate", "states", tc.initState), adsysDir, &shutil.CopyTreeOptions{CopyFunction: shutil.Copy})
 				require.NoError(t, err, "Setup: could not copy initial state")
+				// rename HOST directory in destination:
+				// CopyTree does not use its CopyFunction for directories.
+				src := filepath.Join(adsysDir, "cache", "policies", "HOST")
+				dst := strings.ReplaceAll(src, "HOST", hostname)
+				require.NoError(t, os.Rename(src, dst), "Setup: can't renamed HOST directory to current hostname")
 			}
+
 			// Some tests will need some initial state assets
 			for _, k := range tc.clearDirs {
 				err := os.RemoveAll(filepath.Join(adsysDir, k))
-				require.NoError(t, err, "Remove generate assets db")
+				require.NoError(t, err, "Setup: could not remove generate assets db")
+			}
+			// Some tests will need read only dirs to create failures
+			for _, k := range tc.readOnlyDirs {
+				require.NoError(t, os.MkdirAll(filepath.Join(adsysDir, k), 0750), "Setup: could not create read only dir")
+				testutils.MakeReadOnly(t, filepath.Join(adsysDir, k))
 			}
 
 			// Ticket creation for mock.
 			krb5dir := t.TempDir()
 			krb5ccDir := filepath.Join(adsysDir, "run", "krb5cc")
-			err := os.MkdirAll(krb5ccDir, 0755)
+			err := os.MkdirAll(krb5ccDir, 0750)
 			require.NoError(t, err, "Setup: could not create ticket directory")
 			if tc.krb5ccNamesState == nil {
 				tc.krb5ccNamesState = []krb5ccNamesWithState{
@@ -748,7 +828,7 @@ func TestPolicyUpdate(t *testing.T) {
 				krb5currentDir := krb5dir
 				if krb5.machine {
 					krb5currentDir = filepath.Join(adsysDir, "sss_cache")
-					err := os.MkdirAll(krb5currentDir, 0755)
+					err := os.MkdirAll(krb5currentDir, 0750)
 					require.NoError(t, err, "Setup: could not create machine sss cache")
 				}
 				if krb5.src != "" {
@@ -785,14 +865,19 @@ func TestPolicyUpdate(t *testing.T) {
 			}
 
 			conf := createConf(t, adsysDir)
-			if tc.dynamicADServerDomain != "" {
+			if tc.dynamicADServerDomain != "" || tc.defaultADDomainSuffix != "" {
 				content, err := os.ReadFile(conf)
 				require.NoError(t, err, "Setup: can’t read configuration file")
-				content = bytes.Replace(content, []byte("ad_domain: example.com"), []byte(fmt.Sprintf("ad_domain: %s", tc.dynamicADServerDomain)), 1)
-				if tc.dynamicADServerDomain != "offline" {
-					content = bytes.Replace(content, []byte("ad_server: adc.example.com"), []byte(""), 1)
+				if tc.dynamicADServerDomain != "" {
+					content = bytes.Replace(content, []byte("ad_domain: example.com"), []byte(fmt.Sprintf("ad_domain: %s", tc.dynamicADServerDomain)), 1)
+					if tc.dynamicADServerDomain != "offline" {
+						content = bytes.Replace(content, []byte("ad_server: adc.example.com"), []byte(""), 1)
+					}
 				}
-				err = os.WriteFile(conf, content, 0644)
+				if tc.defaultADDomainSuffix != "" {
+					content = append(content, []byte("\nad_default_domain_suffix: example.com")...)
+				}
+				err = os.WriteFile(conf, content, 0600)
 				require.NoError(t, err, "Setup: can’t rewrite configuration file")
 			}
 			defer runDaemon(t, conf)()
@@ -814,12 +899,25 @@ func TestPolicyUpdate(t *testing.T) {
 			require.NoError(t, err, "client should exit with no error")
 
 			testutils.CompareTreesWithFiltering(t, filepath.Join(adsysDir, "dconf"), filepath.Join("testdata", "PolicyUpdate", "golden", name, "dconf"), update)
+			testutils.CompareTreesWithFiltering(t, filepath.Join(adsysDir, "sudoers.d"), filepath.Join("testdata", "PolicyUpdate", "golden", name, "sudoers.d"), update)
+			testutils.CompareTreesWithFiltering(t, filepath.Join(adsysDir, "polkit-1"), filepath.Join("testdata", "PolicyUpdate", "golden", name, "polkit-1"), update)
+
+			// Current user can have different UID depending on where it’s running. We can’t mock it as we rely on current uid
+			// in the process for authorization check. Just make it generic.
+			if _, err := os.Stat(filepath.Join(adsysDir, "run", "users", currentUID)); err == nil {
+				require.NoError(t, os.Rename(filepath.Join(adsysDir, "run", "users", currentUID),
+					filepath.Join(adsysDir, "run", "users", "<CURRENT_UID>")),
+					"Setup: can't rename current user directory to generic <CURRENT_UID>")
+			}
+
+			testutils.CompareTreesWithFiltering(t, filepath.Join(adsysDir, "run", "users"), filepath.Join("testdata", "PolicyUpdate", "golden", name, "run", "users"), update)
+			testutils.CompareTreesWithFiltering(t, filepath.Join(adsysDir, "run", hostname), filepath.Join("testdata", "PolicyUpdate", "golden", name, "run", "machine"), update)
 		})
 	}
 }
 
 func TestPolicyDebugGPOListScript(t *testing.T) {
-	gpolistSrc, err := ioutil.ReadFile("../../internal/policies/ad/adsys-gpolist")
+	gpolistSrc, err := os.ReadFile("../../internal/ad/adsys-gpolist")
 	require.NoError(t, err, "Setup: failed to load source of adsys-gpolist")
 
 	tests := map[string]struct {
@@ -828,8 +926,8 @@ func TestPolicyDebugGPOListScript(t *testing.T) {
 
 		wantErr bool
 	}{
-		"Get adsys-gpolist script":     {systemAnswer: "yes"},
-		"Version is always authorized": {systemAnswer: "no"},
+		"Get adsys-gpolist script":     {systemAnswer: "polkit_yes"},
+		"Version is always authorized": {systemAnswer: "polkit_no"},
 		"Daemon not responding":        {daemonNotStarted: true, wantErr: true},
 	}
 	for name, tc := range tests {
@@ -887,12 +985,14 @@ func modifyAndAddUsers(t *testing.T, new string, users ...string) (passwd string
 		if strings.HasPrefix(l, fmt.Sprintf("%s:", u.Username)) {
 			l = fmt.Sprintf("%s%s", new, strings.TrimPrefix(l, u.Username))
 		}
-		d.Write([]byte(l + "\n"))
+		_, err = d.Write([]byte(l + "\n"))
+		require.NoError(t, err, "Setup: can’t write to passwd temp file")
 	}
 	require.NoError(t, scanner.Err(), "Setup: can't write temporary passwd file")
 
 	for i, u := range users {
-		d.Write([]byte(fmt.Sprintf("%s:x:%d:%s::/nonexistent:/usr/bin/false", u, i+23450, group)))
+		_, err = d.Write([]byte(fmt.Sprintf("%s:x:%d:%s::/nonexistent:/usr/bin/false", u, i+23450, group)))
+		require.NoError(t, err, "Setup: can’t write to passwd temp file")
 	}
 
 	return dest
@@ -915,4 +1015,85 @@ func chdir(t *testing.T, dir string) {
 			t.Fatalf("Teardown: Can’t restore current directory: %v", err)
 		}
 	})
+}
+
+// setupSubprocessForTest prepares a subprocess with a mock passwd file for running the tests.
+// Returns false if we are already in the subprocess and should continue.
+// Returns true if we prepare the subprocess and reexec ourself.
+func setupSubprocessForTest(t *testing.T, currentUser string, otherUsers ...string) bool {
+	t.Helper()
+
+	if os.Getenv("GO_WANT_HELPER_PROCESS") == "1" {
+		// Restore for subprocess the socket to connect to system daemons
+		for _, mode := range systemAnswersModes {
+			systemSockets[mode] = os.Getenv("DBUS_SYSTEM_BUS_ADDRESS_" + strings.ToUpper(mode))
+		}
+		return false
+	}
+
+	err := exec.Command("pkg-config", "--exists", "nss_wrapper").Run()
+	require.NoError(t, err, "libnss-wrapper is not installed on disk, either skip integration tests or install it")
+
+	testutils.PythonCoverageToGoFormat(t, "../../internal/ad/adsys-gpolist", true)
+
+	var subArgs []string
+	// We are going to only reexec ourself: only take options (without -run)
+	// and redirect coverage file
+	var hasExplicitTestAsRunArg bool
+	for i, arg := range os.Args {
+		if i != 0 && !strings.HasPrefix(arg, "-") {
+			continue
+		}
+		if strings.HasPrefix(arg, "-test.run=") {
+			if !strings.HasPrefix(arg, fmt.Sprintf("-test.run=%s", t.Name())) {
+				continue
+			}
+			hasExplicitTestAsRunArg = true
+		}
+		// Cover subprocess in a different file that we will merge when the test ends
+		if strings.HasPrefix(arg, "-test.coverprofile=") {
+			coverage := strings.TrimPrefix(arg, "-test.coverprofile=")
+			coverage = fmt.Sprintf("%s.%s", coverage, strings.ToLower(t.Name()))
+			arg = fmt.Sprintf("-test.coverprofile=%s", coverage)
+			testutils.AddCoverageFile(coverage)
+		}
+		subArgs = append(subArgs, arg)
+	}
+	if !hasExplicitTestAsRunArg {
+		subArgs = append(subArgs, fmt.Sprintf("-test.run=%s", t.Name()))
+	}
+
+	// #nosec G204: this is only for tests, under controlled args
+	cmd := exec.Command(subArgs[0], subArgs[1:]...)
+
+	admock, err := filepath.Abs("../../internal/testutils/admock")
+	require.NoError(t, err, "Setup: Failed to get current absolute path for ad mock")
+
+	passwd := modifyAndAddUsers(t, currentUser, otherUsers...)
+
+	// Setup correct child environment, including LD_PRELOAD for nss mock
+	cmd.Env = append(os.Environ(),
+		"GO_WANT_HELPER_PROCESS=1",
+
+		// mock for ad python samba code
+		fmt.Sprintf("PYTHONPATH=%s", admock),
+
+		// override user and host database
+		"LD_PRELOAD=libnss_wrapper.so",
+		fmt.Sprintf("NSS_WRAPPER_PASSWD=%s", passwd),
+		"NSS_WRAPPER_GROUP=/etc/group",
+	)
+	// dbus addresses to be reset in child
+	for _, mode := range systemAnswersModes {
+		cmd.Env = append(cmd.Env, fmt.Sprintf("DBUS_SYSTEM_BUS_ADDRESS_%s=%s", strings.ToUpper(mode), systemSockets[mode]))
+	}
+
+	cmd.Stderr = os.Stderr
+	cmd.Stdout = os.Stdout
+	err = cmd.Run()
+	if err != nil {
+		t.Fail() // The real failure will be written by the child test process
+	}
+
+	return true
 }

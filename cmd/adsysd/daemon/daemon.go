@@ -39,12 +39,15 @@ type daemonConfig struct {
 	CacheDir string `mapstructure:"cache_dir"`
 	RunDir   string `mapstructure:"run_dir"`
 
-	DconfDir    string `mapstructure:"dconf_dir"`
-	SSSCacheDir string `mapstructure:"sss_cache_dir"`
+	DconfDir     string `mapstructure:"dconf_dir"`
+	SudoersDir   string `mapstructure:"sudoers_dir"`
+	PolicyKitDir string `mapstructure:"policykit_dir"`
+	SSSCacheDir  string `mapstructure:"sss_cache_dir"`
 
-	ServiceTimeout int    `mapstructure:"service_timeout"`
-	ADServer       string `mapstructure:"ad_server"`
-	ADDomain       string `mapstructure:"ad_domain"`
+	ServiceTimeout        int    `mapstructure:"service_timeout"`
+	ADServer              string `mapstructure:"ad_server"`
+	ADDomain              string `mapstructure:"ad_domain"`
+	ADDefaultDomainSuffix string `mapstructure:"ad_default_domain_suffix"`
 }
 
 // New registers commands and return a new App.
@@ -103,7 +106,10 @@ func New() *App {
 				adsysservice.WithCacheDir(a.config.CacheDir),
 				adsysservice.WithRunDir(a.config.RunDir),
 				adsysservice.WithDconfDir(a.config.DconfDir),
+				adsysservice.WithSudoersDir(a.config.SudoersDir),
+				adsysservice.WithPolicyKitDir(a.config.PolicyKitDir),
 				adsysservice.WithSSSCacheDir(a.config.SSSCacheDir),
+				adsysservice.WithDefaultDomainSuffix(a.config.ADDefaultDomainSuffix),
 			)
 			if err != nil {
 				close(a.ready)
@@ -139,13 +145,16 @@ func New() *App {
 	a.rootCmd.PersistentFlags().IntP("timeout", "t", consts.DefaultServiceTimeout, i18n.G("time in seconds without activity before the service exists. 0 for no timeout."))
 	decorate.LogOnError(a.viper.BindPFlag("service_timeout", a.rootCmd.PersistentFlags().Lookup("timeout")))
 
-	a.rootCmd.PersistentFlags().StringP("ad-server", "S", "", i18n.G("URL of the Active Directory server. Empty to let ADSys parsing sssd.conf."))
+	a.rootCmd.PersistentFlags().StringP("ad-server", "S", "", i18n.G("URL of the Active Directory server. This overrides parsing sssd.conf."))
 	decorate.LogOnError(a.viper.BindPFlag("ad_server", a.rootCmd.PersistentFlags().Lookup("ad-server")))
-	a.rootCmd.PersistentFlags().StringP("ad-domain", "D", "", i18n.G("AD domain to use. Empty to let ADSys parsing sssd.conf."))
+	a.rootCmd.PersistentFlags().StringP("ad-domain", "D", "", i18n.G("AD domain to use. This overrides parsing sssd.conf"))
 	decorate.LogOnError(a.viper.BindPFlag("ad_domain", a.rootCmd.PersistentFlags().Lookup("ad-domain")))
+	a.rootCmd.PersistentFlags().StringP("ad-default-domain-suffix", "", "", i18n.G("AD default domain suffix to use. This overrides parsing sssd.conf."))
+	decorate.LogOnError(a.viper.BindPFlag("ad_default_domain_suffix", a.rootCmd.PersistentFlags().Lookup("ad-default-domain-suffix")))
 
 	// subcommands
 	a.installVersion()
+	a.installRunScripts()
 
 	return &a
 }
@@ -202,4 +211,9 @@ func (a App) RootCmd() cobra.Command {
 // Note: we need to use a pointer to not copy the App object before the daemon is ready, and thus, creates a data race.
 func (a *App) WaitReady() {
 	<-a.ready
+}
+
+// SetArgs changes the root command args. Shouldn’t be in general necessary apart for integration tests.
+func (a *App) SetArgs(args []string) {
+	a.rootCmd.SetArgs(args)
 }

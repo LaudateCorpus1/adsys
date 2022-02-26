@@ -47,6 +47,8 @@ func TestNew(t *testing.T) {
 			adsysCacheDir := filepath.Join(temp, "cache")
 			adsysRunDir := filepath.Join(temp, "run")
 			dconfDir := filepath.Join(temp, "dconf")
+			sudoersDir := filepath.Join(temp, "sudoers.d")
+			policyKitDir := filepath.Join(temp, "polkit-1")
 			sssCacheDir := filepath.Join(temp, "sss")
 			if tc.existingAdsysDirs {
 				require.NoError(t, os.MkdirAll(adsysCacheDir, 0700), "Setup: could not create adsys cache directory")
@@ -59,7 +61,7 @@ func TestNew(t *testing.T) {
 				err := os.Chmod(adsysCacheDir, 0000)
 				require.NoError(t, err, "Setup: Could not prevent writing to cache directory")
 				defer func() {
-					err := os.Chmod(adsysCacheDir, 0700)
+					err := os.Chmod(adsysCacheDir, 0600)
 					require.NoError(t, err, "Teardown: Could not restore writing to cache directory")
 				}()
 			}
@@ -68,8 +70,11 @@ func TestNew(t *testing.T) {
 				adsysservice.WithCacheDir(adsysCacheDir),
 				adsysservice.WithRunDir(adsysRunDir),
 				adsysservice.WithDconfDir(dconfDir),
+				adsysservice.WithSudoersDir(sudoersDir),
+				adsysservice.WithPolicyKitDir(policyKitDir),
 				adsysservice.WithSSSCacheDir(sssCacheDir),
 				adsysservice.WithMockAuthorizer(&auth),
+				adsysservice.WithDefaultDomainSuffix("mydomain.biz"),
 			}
 			if tc.readUnexistingSssdConf {
 				options = append(options, adsysservice.WithSSSdConf(filepath.Join(temp, "does-not-exists", "sssd.conf")))

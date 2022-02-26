@@ -2,14 +2,13 @@ package testutils
 
 import (
 	"bufio"
-	// blank embed import for python3-mock.in
+	// blank embed import for python3-mock.in.
 	_ "embed"
 	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
-	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -17,11 +16,6 @@ import (
 )
 
 const coverageCmd = "python3-coverage"
-
-var (
-	tempdir string
-	once    sync.Once
-)
 
 //go:embed python3-mock.in
 var python3Mock string
@@ -41,19 +35,17 @@ func PythonCoverageToGoFormat(t *testing.T, include string, commandOnStdin bool)
 	require.NoErrorf(t, err, "Setup: coverage requested and no %s executable found in $PATH for python code", coverageCmd)
 
 	coverDir := filepath.Dir(goCoverProfile)
-	err = os.Setenv("COVERAGE_FILE", filepath.Join(coverDir, "pythoncode.coverage"))
+	pythonCoverageFile := filepath.Join(coverDir, "pythoncode.coverage")
+	err = os.Setenv("COVERAGE_FILE", pythonCoverageFile)
 	require.NoError(t, err, "Setup: can’t set python coverage")
 
 	// Create temporary directory and set PATH
 	var origPath string
-	once.Do(func() {
-		var err error
-		tempdir, err = os.MkdirTemp("", "cover-python-mocks")
-		require.NoError(t, err, "Setup: create temporary directory for covered python mocks")
-		origPath = os.Getenv("PATH")
-		err = os.Setenv("PATH", fmt.Sprintf("%s:%s", tempdir, origPath))
-		require.NoError(t, err, "Setup: can’t prefix covered python mocks to PATH")
-	})
+	tempdir, err := os.MkdirTemp("", "cover-python-mocks")
+	require.NoError(t, err, "Setup: create temporary directory for covered python mocks")
+	origPath = os.Getenv("PATH")
+	err = os.Setenv("PATH", fmt.Sprintf("%s:%s", tempdir, origPath))
+	require.NoError(t, err, "Setup: can’t prefix covered python mocks to PATH")
 
 	tracedFile := include
 
@@ -72,23 +64,31 @@ func PythonCoverageToGoFormat(t *testing.T, include string, commandOnStdin bool)
 exec python3-coverage run -a %s $@
 `, realBinaryPath))
 	}
+	// #nosec G306. We want this asset to be executable.
 	err = os.WriteFile(filepath.Join(tempdir, mockedFile), d, 0700)
 	require.NoError(t, err, "Setup: can’t create prefixed covered python mock")
 
 	t.Cleanup(func() {
+		defer func() {
+			err = os.Unsetenv("COVERAGE_FILE")
+			require.NoError(t, err, "Teardown: can’t restore coverage file env variable")
+
+			// Restore mocks and env variables
+			err = os.RemoveAll(tempdir)
+			require.NoError(t, err, "Teardown: can’t remove temporary directory for covered python mocks")
+			err = os.Setenv("PATH", origPath)
+			require.NoError(t, err, "Teardown: can’t restore original PATH")
+		}()
+
+		// Only report python coverage if file was created
+		if _, err := os.Stat(pythonCoverageFile); err != nil {
+			return
+		}
+
 		// Convert to text format
 		// #nosec G204 - we have a const for coverageCmd
 		out, err := exec.Command(coverageCmd, "annotate", "-d", coverDir, "--include", tracedFile).CombinedOutput()
 		require.NoErrorf(t, err, "Teardown: can’t combine python coverage: %v", string(out))
-
-		err = os.Unsetenv("COVERAGE_FILE")
-		require.NoError(t, err, "Teardown: can’t restore coverage file env variable")
-
-		// Restore mocks and env variables
-		err = os.RemoveAll(tempdir)
-		require.NoError(t, err, "Teardown: can’t remove temporary directory for covered python mocks")
-		err = os.Setenv("PATH", origPath)
-		require.NoError(t, err, "Teardown: can’t restore original PATH")
 
 		// Convert to golang compatible cover format
 		// search for go.mod to file fqdnFile
@@ -100,7 +100,7 @@ exec python3-coverage run -a %s $@
 		require.NoErrorf(t, err, "Teardown: failed opening python cover file: %s", err)
 		defer func() { assert.NoError(t, inF.Close(), "Teardown: can’t close python cover file") }()
 
-		golangInclude := filepath.Join(coverDir, filepath.Base(include)+".gocover")
+		golangInclude := filepath.Join(coverDir, t.Name()+".gocover")
 		outF, err := os.Create(golangInclude)
 		require.NoErrorf(t, err, "Teardown: failed opening output golang compatible cover file: %s", err)
 		defer func() { assert.NoError(t, outF.Close(), "Teardown: can’t close golang compatible cover file") }()
@@ -138,7 +138,7 @@ exec python3-coverage run -a %s $@
 	return true
 }
 
-// fqdnToPath allows to return the fqdn path for this file relative to go.mod
+// fqdnToPath allows to return the fqdn path for this file relative to go.mod.
 func fqdnToPath(t *testing.T, path string) string {
 	t.Helper()
 

@@ -26,7 +26,7 @@ import (
 	"google.golang.org/grpc"
 )
 
-const dockerSystemDaemonsImage = "docker.pkg.github.com/ubuntu/adsys/systemdaemons:0.1"
+const dockerSystemDaemonsImage = "ghcr.io/ubuntu/adsys/systemdaemons:0.1"
 
 var update bool
 
@@ -35,11 +35,16 @@ func TestMain(m *testing.M) {
 		fmt.Println("Integration tests skipped as requested")
 		return
 	}
+
 	// Start 2 containers running local polkitd with our policy (one for always yes, one for always no)
 	// We only start samba on non helper process
 	if os.Getenv("GO_WANT_HELPER_PROCESS") != "1" {
 		defer runDaemons()()
-		defer testutils.SetupSmb(1446, "testdata/PolicyUpdate/AD/SYSVOL", "")()
+		cwd, err := os.Getwd()
+		if err != nil {
+			log.Fatalf("Setup: cant't get current working directory: %v", err)
+		}
+		defer testutils.SetupSmb(1446, filepath.Join(cwd, "testdata/PolicyUpdate/AD/SYSVOL"))()
 	}
 
 	flag.BoolVar(&update, "update", false, "update golden files")
@@ -53,7 +58,7 @@ func TestMain(m *testing.M) {
 }
 
 func TestStartAndStopDaemon(t *testing.T) {
-	systemAnswer(t, "yes")
+	systemAnswer(t, "polkit_yes")
 
 	conf := createConf(t, "")
 	quit := runDaemon(t, conf)
@@ -74,11 +79,11 @@ func TestCommandsError(t *testing.T) {
 		err = srv.Serve(lis)
 		require.NoError(t, err, "Setup: Serving GRPC on unix socket failed")
 	}()
-	defer srv.Stop()
+	t.Cleanup(srv.Stop)
 	time.Sleep(time.Second)
 	confFile := filepath.Join(dir, "adsys.yaml")
 	err := os.WriteFile(confFile, []byte(fmt.Sprintf(`
-socket: %s`, socket)), 0644)
+socket: %s`, socket)), 0600)
 	require.NoError(t, err, "Setup: config file should be created")
 
 	tests := map[string]struct {
@@ -121,66 +126,54 @@ func (server *timeoutOnVersionServer) Version(_ *adsys.Empty, s adsys.Service_Ve
 	return nil
 }
 
-func TestCommandsTimeout(t *testing.T) {
-	// We only implement one command to test the client timeout functionality
-	timeoutServer := timeoutOnVersionServer{callbackHandled: make(chan struct{})}
-	srv := grpc.NewServer(authorizer.WithUnixPeerCreds())
-	adsys.RegisterServiceServer(srv, &timeoutServer)
+func TestCommandsTimeouts(t *testing.T) {
+	tests := map[string]struct {
+		timeout     int
+		wantTimeout bool
+	}{
+		"Should timeout":  {timeout: 1, wantTimeout: true},
+		"0 is no timeout": {timeout: 0},
+	}
+	for name, tc := range tests {
+		tc := tc
+		t.Run(name, func(t *testing.T) {
+			// We only implement one command to test the client timeout functionality
+			timeoutServer := timeoutOnVersionServer{callbackHandled: make(chan struct{})}
+			srv := grpc.NewServer(authorizer.WithUnixPeerCreds())
+			adsys.RegisterServiceServer(srv, &timeoutServer)
 
-	dir := t.TempDir()
-	socket := filepath.Join(dir, "socket")
-	go func() {
-		lis, err := net.Listen("unix", socket)
-		require.NoError(t, err, "Setup: Listen on unix socket failed")
-		err = srv.Serve(lis)
-		require.NoError(t, err, "Setup: Serving GRPC on unix socket failed")
-	}()
-	defer srv.Stop()
-	time.Sleep(time.Second)
-	confFile := filepath.Join(dir, "adsys.yaml")
-	err := os.WriteFile(confFile, []byte(fmt.Sprintf(`
+			dir := t.TempDir()
+			socket := filepath.Join(dir, "socket")
+			go func() {
+				lis, err := net.Listen("unix", socket)
+				require.NoError(t, err, "Setup: Listen on unix socket failed")
+				err = srv.Serve(lis)
+				require.NoError(t, err, "Setup: Serving GRPC on unix socket failed")
+			}()
+			defer srv.Stop()
+			time.Sleep(time.Second)
+			confFile := filepath.Join(dir, "adsys.yaml")
+			err := os.WriteFile(confFile, []byte(fmt.Sprintf(`
 socket: %s
-client_timeout: 1`, socket)), 0644)
-	require.NoError(t, err, "Setup: config file should be created")
+client_timeout: %d`, socket, tc.timeout)), 0600)
+			require.NoError(t, err, "Setup: config file should be created")
 
-	_, err = runClient(t, confFile, "version")
-	require.Error(t, err, "command should fail due to timeout")
-
-	<-timeoutServer.callbackHandled
-	require.True(t, timeoutServer.clientCancelled, "server should have got timeout request")
-}
-
-func TestCommands0IsNoTimeout(t *testing.T) {
-	// We only implement one command to test the client timeout functionality
-	timeoutServer := timeoutOnVersionServer{callbackHandled: make(chan struct{})}
-	srv := grpc.NewServer(authorizer.WithUnixPeerCreds())
-	adsys.RegisterServiceServer(srv, &timeoutServer)
-
-	dir := t.TempDir()
-	socket := filepath.Join(dir, "socket")
-	go func() {
-		lis, err := net.Listen("unix", socket)
-		require.NoError(t, err, "Setup: Listen on unix socket failed")
-		err = srv.Serve(lis)
-		require.NoError(t, err, "Setup: Serving GRPC on unix socket failed")
-	}()
-	defer srv.Stop()
-	time.Sleep(time.Second)
-	confFile := filepath.Join(dir, "adsys.yaml")
-	err := os.WriteFile(confFile, []byte(fmt.Sprintf(`
-socket: %s
-client_timeout: 0`, socket)), 0644)
-	require.NoError(t, err, "Setup: config file should be created")
-
-	_, err = runClient(t, confFile, "version")
-	require.NoError(t, err, "command should not fail as there is no timeout")
-
-	<-timeoutServer.callbackHandled
-	require.False(t, timeoutServer.clientCancelled, "server should have not got a timeout request")
+			_, err = runClient(t, confFile, "version")
+			if tc.wantTimeout {
+				require.Error(t, err, "command should fail due to timeout")
+				<-timeoutServer.callbackHandled
+				require.True(t, timeoutServer.clientCancelled, "server should have got timeout request")
+			} else {
+				require.NoError(t, err, "command should not fail as there is no timeout")
+				<-timeoutServer.callbackHandled
+				require.False(t, timeoutServer.clientCancelled, "server should have not got a timeout request")
+			}
+		})
+	}
 }
 
 // createConf generates an adsys configuration in a temporary directory
-// It will use adsysDir for socket, cache and run dir if provided
+// It will use adsysDir for socket, cache and run dir if provided.
 func createConf(t *testing.T, adsysDir string) (conf string) {
 	t.Helper()
 
@@ -205,11 +198,14 @@ ad_domain: example.com
 
 # Those are more for tests
 dconf_dir: %s/dconf
+sudoers_dir: %s/sudoers.d
+policykit_dir: %s/polkit-1
 sss_cache_dir: %s/sss_cache
-`, dir, dir, dir, dir, dir)), 0644)
+`, dir, dir, dir, dir, dir, dir, dir)), 0600)
 	require.NoError(t, err, "Setup: config file should be created")
 
-	require.NoError(t, os.MkdirAll(filepath.Join(dir, "dconf"), 0755), "Setup: should create dconf dir")
+	require.NoError(t, os.MkdirAll(filepath.Join(dir, "dconf"), 0750), "Setup: should create dconf dir")
+	// Don’t create empty dirs for sudo and polkit: todo: same for dconf?
 
 	return confFile
 }
@@ -221,7 +217,7 @@ func runDaemon(t *testing.T, conf string) (quit func()) {
 
 	var wg sync.WaitGroup
 	d := daemon.New()
-	changeOsArgs(t, conf)
+	changeAppArgs(t, d, conf)
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
@@ -254,7 +250,7 @@ func runClient(t *testing.T, conf string, args ...string) (stdout string, err er
 	t.Helper()
 
 	c := client.New()
-	changeOsArgs(t, conf, args...)
+	changeAppArgs(t, c, conf, args...)
 
 	// capture stdout
 	r, w, err := os.Pipe()
@@ -274,35 +270,37 @@ func runClient(t *testing.T, conf string, args ...string) (stdout string, err er
 	return out.String(), err
 }
 
-// changeOsArgs modifies the os Args for cobra to parse them successfully.
-// As os.Args is global, calling it prevents any parallell testing.
-// It returns a function to restore the args if you want to do so before the test ends.
-func changeOsArgs(t *testing.T, conf string, args ...string) (restore func()) {
+type setterArgs interface {
+	SetArgs([]string)
+}
+
+// changeAppArgs modifies the application Args for cobra to parse them successfully.
+// Do not share the daemon or client passed to it, as cobra store it globally.
+func changeAppArgs(t *testing.T, s setterArgs, conf string, args ...string) {
 	t.Helper()
 
-	origArgs := os.Args
-
-	os.Args = []string{"tests", "-vv"}
+	newArgs := []string{"-vv"}
 	if conf != "" {
-		os.Args = append(os.Args, "-c", conf)
+		newArgs = append(newArgs, "-c", conf)
 	}
 	if args != nil {
-		os.Args = append(os.Args, args...)
+		newArgs = append(newArgs, args...)
 	}
 
-	var once sync.Once
-	restore = func() {
-		once.Do(func() {
-			os.Args = origArgs
-		})
-	}
-
-	t.Cleanup(restore)
-	return restore
+	s.SetArgs(newArgs)
 }
 
 var (
-	systemSockets map[string]string
+	systemSockets      = make(map[string]string)
+	systemAnswersModes = []string{
+		"polkit_yes",
+		"polkit_no",
+		"no_startup_time",
+		"invalid_startup_time",
+		"no_nextrefresh_time",
+		"invalid_nextrefresh_time",
+		"subscription_disabled",
+	}
 )
 
 // runDaemons is a helper to start polkit, mock systemd and a system dbus session in multile containers:
@@ -332,15 +330,10 @@ func runDaemons() (teardown func()) {
 		log.Fatalf("Setup: failed to create temporary directory: %v", err)
 	}
 
-	answers := map[string]string{
-		"yes":                      filepath.Join(dir, "yes"),
-		"no":                       filepath.Join(dir, "no"),
-		"no_startup_time":          filepath.Join(dir, "nostartuptime"),
-		"invalid_startup_time":     filepath.Join(dir, "invalidstartuptime"),
-		"no_nextrefresh_time":      filepath.Join(dir, "nonextrefreshtime"),
-		"invalid_nextrefresh_time": filepath.Join(dir, "invalidnextrefreshtime"),
+	answers := make(map[string]string)
+	for _, mode := range systemAnswersModes {
+		answers[mode] = filepath.Join(dir, mode)
 	}
-	systemSockets = make(map[string]string)
 
 	var wg sync.WaitGroup
 	for answer, socketDir := range answers {
@@ -351,10 +344,11 @@ func runDaemons() (teardown func()) {
 		go func() {
 			defer wg.Done()
 
-			if err := os.MkdirAll(socketDir, 0755); err != nil {
+			if err := os.MkdirAll(socketDir, 0750); err != nil {
 				log.Fatalf("Setup: can’t create %s socket directory: %v", answer, err)
 			}
 
+			// #nosec G204: we control the name in tests
 			cmd := exec.Command("docker",
 				"run", "--rm", "--pid", "host",
 				"--name", containerName+answer,
@@ -368,7 +362,7 @@ func runDaemons() (teardown func()) {
 			out, _ := cmd.CombinedOutput()
 			// Docker stop -t 0 will kill it anyway the container with exit code 143
 			if cmd.ProcessState.ExitCode() > 0 && cmd.ProcessState.ExitCode() != 143 {
-				log.Fatalf("Error running system daemons %s container: %v", answer, string(out))
+				log.Fatalf("Error running system daemons container named %q:\n%v", answer, string(out))
 			}
 		}()
 	}
@@ -378,6 +372,7 @@ func runDaemons() (teardown func()) {
 	}
 
 	// give time for polkit containers to start
+	// TODO: wait for polkit containers to be ready
 	time.Sleep(5 * time.Second)
 
 	return func() {
@@ -389,6 +384,7 @@ func runDaemons() (teardown func()) {
 		}()
 
 		for answer := range answers {
+			// #nosec G204: we control the args in tests
 			out, err := exec.Command("docker", "stop", "-t", "0", containerName+answer).CombinedOutput()
 			if err != nil {
 				log.Fatalf("Teardown: can’t stop system daemons container: %v", string(out))
@@ -465,13 +461,14 @@ func TestExecuteCommand(t *testing.T) {
 
 var testCmdName = os.Args[0]
 
-func startCmd(t *testing.T, wait bool, args ...string) (out func() string, stop func() error, err error) {
+func startCmd(t *testing.T, wait bool, args ...string) (out func() string, stop func(), err error) {
 	t.Helper()
 
 	cmdArgs := []string{"env", "GO_WANT_HELPER_PROCESS=1", testCmdName, "-test.run=TestExecuteCommand", "--"}
 	cmdArgs = append(cmdArgs, args...)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	// #nosec G204: this is only for tests, under controlled args
 	cmd := exec.CommandContext(ctx, cmdArgs[0], cmdArgs[1:]...)
 
 	var b bytes.Buffer
@@ -482,16 +479,15 @@ func startCmd(t *testing.T, wait bool, args ...string) (out func() string, stop 
 	if wait {
 		err := cmd.Wait()
 		cancel()
-		return func() string { return b.String() }, func() error { return nil }, err
+		return func() string { return b.String() }, func() {}, err
 	}
 
 	return func() string { return b.String() },
-		func() error {
+		func() {
 			if err := cmd.Process.Kill(); err != nil {
 				t.Fatal("Failed to kill process: ", err)
 			}
-			err := cmd.Wait()
+			_ = cmd.Wait()
 			cancel()
-			return err
 		}, err
 }
