@@ -16,7 +16,7 @@ require (
 	github.com/snapcore/go-gettext v0.0.0-20191107141714-82bbea49e785
 	github.com/spf13/cobra v1.3.0
 	github.com/spf13/viper v1.10.1
-	github.com/stretchr/testify v1.7.0
+	github.com/stretchr/testify v1.7.3
 	github.com/termie/go-shutil v0.0.0-20140729215957-bcacb06fecae
 	golang.org/x/exp v0.0.0-20220114162006-9d54fb35363c
 	golang.org/x/net v0.0.0-20211112202133-69e39bad7dc2
@@ -27,5 +27,5 @@ require (
 	google.golang.org/grpc/cmd/protoc-gen-go-grpc v1.2.0
 	google.golang.org/protobuf v1.27.1
 	gopkg.in/ini.v1 v1.66.4
-	gopkg.in/yaml.v3 v3.0.0-20210107192922-496545a6307b
+	gopkg.in/yaml.v3 v3.0.1
 )
